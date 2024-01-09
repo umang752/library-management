@@ -29,5 +29,14 @@ class User extends Authenticatable
         'phone',
         'status',
     ];
+    public function membership(){
+        return $this->hasMany(Membership::class);
+    }
+    public function user_role(){
+        return $this->hasMany(UserRole::class);
+    }
+    public function book_issued(){
+        return $this->hasMany(BookIssued::class);
+    }
 
 }
