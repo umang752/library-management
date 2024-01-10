@@ -5,6 +5,7 @@ use App\Http\Controllers\RegistrationFormController;
 use App\Http\Controllers\LoginFormController;
 use App\Http\Controllers\AdminPageController;
 use App\Http\Controllers\ForgotPasswordFormController;
+use App\Http\Controllers\ManageUsersController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -51,3 +52,12 @@ Route::get('/logout',function(Request $request){
     Session::regenerateToken();
     return redirect('/login');
 });
+
+Route::get('/manage-users',[ManageUsersController::class,'giveUsers']);
+Route::get('/manage-users/delete/{id?}',[ManageUsersController::class,'deleteUser']);
+Route::get('/manage-users/edit/{id?}',[ManageUsersController::class,'editUser'])->name('edit.user');
+
+
+Route::get('/manage-books',);
+
+Route::get('/manage-issued-books',);

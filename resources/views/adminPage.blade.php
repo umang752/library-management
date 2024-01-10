@@ -12,13 +12,13 @@
     <h1 class="text-center">Admin Dashboard</h1>
     <div class="btn-container">
       <div class="btn-group">
-        <a href="" class="btn btn-primary btn-lg">Manage Users</a>
+        <a href="{{url('/manage-users')}}" class="btn btn-primary btn-lg">Manage Users</a>
       </div>
       <div class="btn-group">
-        <a href="" class="btn btn-success btn-lg">Manage Books</a>
+        <a href="{{url('/manage-books')}}" class="btn btn-success btn-lg">Manage Books</a>
       </div>
       <div class="btn-group">
-        <a href="" class="btn btn-info btn-lg">Manage Issued Books</a>
+        <a href="{{url('/manage-issued-books')}}" class="btn btn-info btn-lg">Manage Issued Books</a>
       </div>
       <div class="btn-group">
         <a href="/logout" class="btn btn-info btn-lg">Logout</a>
