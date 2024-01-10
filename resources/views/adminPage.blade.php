@@ -3,11 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+
 </head>
 <body>
-    <h1-6>Example heading<span class="badge badge-primary">New</span></h1-6>
-    <a href="/" class="badge badge-primary">Manage Users</a>
-    <a href="#" class="badge badge-primary">Manage Books</a>
+<div class="container">
+    <h1 class="text-center">Admin Dashboard</h1>
+    <div class="btn-container">
+      <div class="btn-group">
+        <a href="" class="btn btn-primary btn-lg">Manage Users</a>
+      </div>
+      <div class="btn-group">
+        <a href="" class="btn btn-success btn-lg">Manage Books</a>
+      </div>
+      <div class="btn-group">
+        <a href="" class="btn btn-info btn-lg">Manage Issued Books</a>
+      </div>
+      <div class="btn-group">
+        <a href="/logout" class="btn btn-info btn-lg">Logout</a>
+      </div>
+    </div>
+</div>
 </body>
 </html>

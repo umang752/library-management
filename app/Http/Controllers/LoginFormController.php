@@ -24,6 +24,7 @@ class LoginFormController extends Controller
                 ->first();
             
         if($user){
+            $request->session()->put("user_id",$user->user_id);
             return redirect('/admin');
             // return view('adminPage');
         }

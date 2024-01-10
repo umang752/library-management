@@ -39,3 +39,15 @@ Route::get('/admin',[AdminPageController::class,'showPage']);
 Route::post('/admin',function(){
     echo "Helllo this is post request of /admin url";
 });
+
+
+// Route to handle Logout::::
+Route::get('/logout',function(Request $request){
+    // $request->session()->forget("user_id");
+    // $request->session()->invalidate();
+    // $request->session()->regenerateToken();
+    Session::forget('user_id');
+    Session::invalidate();
+    Session::regenerateToken();
+    return redirect('/login');
+});
