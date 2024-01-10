@@ -24,8 +24,8 @@ class LoginFormController extends Controller
                 ->first();
             
         if($user){
-            // return redirect('/admin');
-            return view('adminPage');
+            return redirect('/admin');
+            // return view('adminPage');
         }
         else{
             echo "Incorrect email or password";

@@ -1,9 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\RegistrationFormControllcer;
+use App\Http\Controllers\RegistrationFormController;
 use App\Http\Controllers\LoginFormController;
 use App\Http\Controllers\AdminPageController;
+use App\Http\Controllers\ForgotPasswordFormController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -25,8 +26,16 @@ Route::post('/register',[RegistrationFormController::class,'saveFormData']);
 Route::get('/login',[LoginFormController::class,'giveLoginForm']);
 Route::post('/login',[LoginFormController::class,'validateLoginData']);
 
+// Forgot Password Page Routes:::
+Route::get('/forgotPassword',[ForgotPasswordFormController::class,'showForm']);
+// Route::get('/forgotPassword',function(){
+//     return view('forgotPasswordForm');
+// });
+Route::post('/forgotPassword',[ForgotPasswordFormController::class,'sendOTP']);
+
+
 // Admin Page Routes:::::
 Route::get('/admin',[AdminPageController::class,'showPage']);
 Route::post('/admin',function(){
-    echo "Helllo";
+    echo "Helllo this is post request of /admin url";
 });

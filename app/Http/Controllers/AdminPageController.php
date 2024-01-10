@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 class AdminPageController extends Controller
 {
     public function showPage(){
-        echo "Hello Admin";
-        // return view("adminPage");
+        // echo "Hello Admin";
+        return view("adminPage");
     }
 }

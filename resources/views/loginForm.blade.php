@@ -25,7 +25,7 @@
     <x-Input type="password" name="Password" />
     <button type="submit" class="btn btn-primary">Submit</button>
     <x-Links linkUrl="/register" label="Sign Up" />
-    <x-Links linkUrl="/forgotPassword" label="Forgot Passsword?" />
+    <x-Links linkUrl="/forgotPassword" label="Forgot?" />
   </div>
 </form>
 </body>
