@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('password', 20);
             $table->string('phone', 15);
             $table->string('status');
+            $table->string('type',10);
             $table->timestamps();
         });
     }
