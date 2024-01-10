@@ -1,0 +1,1 @@
+<div><h1 class='text-center'>{{ $headingName }}</h1></div>
