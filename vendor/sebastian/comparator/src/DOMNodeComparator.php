@@ -1,47 +1,65 @@
-<?php declare(strict_types=1);
+<?php
 /*
- * This file is part of sebastian/comparator.
+ * This file is part of the Comparator package.
  *
  * (c) Sebastian Bergmann <sebastian@phpunit.de>
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace SebastianBergmann\Comparator;
 
-use function assert;
-use function mb_strtolower;
-use function sprintf;
 use DOMDocument;
 use DOMNode;
-use ValueError;
 
-final class DOMNodeComparator extends ObjectComparator
+/**
+ * Compares DOMNode instances for equality.
+ */
+class DOMNodeComparator extends ObjectComparator
 {
-    public function accepts(mixed $expected, mixed $actual): bool
+    /**
+     * Returns whether the comparator can compare two values.
+     *
+     * @param  mixed $expected The first value to compare
+     * @param  mixed $actual   The second value to compare
+     * @return bool
+     */
+    public function accepts($expected, $actual)
     {
         return $expected instanceof DOMNode && $actual instanceof DOMNode;
     }
 
     /**
+     * Asserts that two values are equal.
+     *
+     * @param mixed $expected     First value to compare
+     * @param mixed $actual       Second value to compare
+     * @param float $delta        Allowed numerical distance between two values to consider them equal
+     * @param bool  $canonicalize Arrays are sorted before comparison when set to true
+     * @param bool  $ignoreCase   Case is ignored when set to true
+     * @param array $processed    List of already processed elements (used to prevent infinite recursion)
+     *
      * @throws ComparisonFailure
      */
-    public function assertEquals(mixed $expected, mixed $actual, float $delta = 0.0, bool $canonicalize = false, bool $ignoreCase = false, array &$processed = []): void
+    public function assertEquals($expected, $actual, $delta = 0.0, $canonicalize = false, $ignoreCase = false, array &$processed = array())
     {
-        assert($expected instanceof DOMNode);
-        assert($actual instanceof DOMNode);
-
         $expectedAsString = $this->nodeToText($expected, true, $ignoreCase);
         $actualAsString   = $this->nodeToText($actual, true, $ignoreCase);
 
         if ($expectedAsString !== $actualAsString) {
-            $type = $expected instanceof DOMDocument ? 'documents' : 'nodes';
+            if ($expected instanceof DOMDocument) {
+                $type = 'documents';
+            } else {
+                $type = 'nodes';
+            }
 
             throw new ComparisonFailure(
                 $expected,
                 $actual,
                 $expectedAsString,
                 $actualAsString,
+                false,
                 sprintf("Failed asserting that two DOM %s are equal.\n", $type)
             );
         }
@@ -50,31 +68,40 @@ final class DOMNodeComparator extends ObjectComparator
     /**
      * Returns the normalized, whitespace-cleaned, and indented textual
      * representation of a DOMNode.
+     *
+     * @param  DOMNode $node
+     * @param  bool    $canonicalize
+     * @param  bool    $ignoreCase
+     * @return string
      */
-    private function nodeToText(DOMNode $node, bool $canonicalize, bool $ignoreCase): string
+    private function nodeToText(DOMNode $node, $canonicalize, $ignoreCase)
     {
         if ($canonicalize) {
             $document = new DOMDocument;
-
-            try {
-                $c14n = $node->C14N();
-
-                assert(!empty($c14n));
-
-                @$document->loadXML($c14n);
-            } catch (ValueError) {
-            }
+            $document->loadXML($node->C14N());
 
             $node = $document;
         }
 
-        $document = $node instanceof DOMDocument ? $node : $node->ownerDocument;
+        if ($node instanceof DOMDocument) {
+            $document = $node;
+        } else {
+            $document = $node->ownerDocument;
+        }
 
         $document->formatOutput = true;
         $document->normalizeDocument();
 
-        $text = $node instanceof DOMDocument ? $node->saveXML() : $document->saveXML($node);
+        if ($node instanceof DOMDocument) {
+            $text = $node->saveXML();
+        } else {
+            $text = $document->saveXML($node);
+        }
 
-        return $ignoreCase ? mb_strtolower($text, 'UTF-8') : $text;
+        if ($ignoreCase) {
+            $text = strtolower($text);
+        }
+
+        return $text;
     }
 }

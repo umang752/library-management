@@ -2,13 +2,10 @@
 
 namespace Illuminate\Mail;
 
-use Illuminate\Contracts\View\Factory as ViewFactory;
+use Parsedown;
+use Illuminate\Support\Arr;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
-use League\CommonMark\Environment\Environment;
-use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
-use League\CommonMark\Extension\Table\TableExtension;
-use League\CommonMark\MarkdownConverter;
+use Illuminate\Contracts\View\Factory as ViewFactory;
 use TijsVerkoyen\CssToInlineStyles\CssToInlineStyles;
 
 class Markdown
@@ -16,7 +13,7 @@ class Markdown
     /**
      * The view factory implementation.
      *
-     * @var \Illuminate\Contracts\View\Factory
+     * @var \Illuminate\View\Factory
      */
     protected $view;
 
@@ -44,8 +41,8 @@ class Markdown
     public function __construct(ViewFactory $view, array $options = [])
     {
         $this->view = $view;
-        $this->theme = $options['theme'] ?? 'default';
-        $this->loadComponentsFrom($options['paths'] ?? []);
+        $this->theme = Arr::get($options, 'theme', 'default');
+        $this->loadComponentsFrom(Arr::get($options, 'paths', []));
     }
 
     /**
@@ -64,21 +61,13 @@ class Markdown
             'mail', $this->htmlComponentPaths()
         )->make($view, $data)->render();
 
-        if ($this->view->exists($customTheme = Str::start($this->theme, 'mail.'))) {
-            $theme = $customTheme;
-        } else {
-            $theme = str_contains($this->theme, '::')
-                ? $this->theme
-                : 'mail::themes.'.$this->theme;
-        }
-
-        return new HtmlString(($inliner ?: new CssToInlineStyles)->convert(
-            $contents, $this->view->make($theme, $data)->render()
+        return new HtmlString(with($inliner ?: new CssToInlineStyles)->convert(
+            $contents, $this->view->make('mail::themes.'.$this->theme)->render()
         ));
     }
 
     /**
-     * Render the Markdown template into text.
+     * Render the Markdown template into HTML.
      *
      * @param  string  $view
      * @param  array  $data
@@ -89,7 +78,7 @@ class Markdown
         $this->view->flushFinderCache();
 
         $contents = $this->view->replaceNamespace(
-            'mail', $this->textComponentPaths()
+            'mail', $this->markdownComponentPaths()
         )->make($view, $data)->render();
 
         return new HtmlString(
@@ -101,20 +90,13 @@ class Markdown
      * Parse the given Markdown text into HTML.
      *
      * @param  string  $text
-     * @return \Illuminate\Support\HtmlString
+     * @return string
      */
     public static function parse($text)
     {
-        $environment = new Environment([
-            'allow_unsafe_links' => false,
-        ]);
+        $parsedown = new Parsedown;
 
-        $environment->addExtension(new CommonMarkCoreExtension);
-        $environment->addExtension(new TableExtension);
-
-        $converter = new MarkdownConverter($environment);
-
-        return new HtmlString($converter->convert($text)->getContent());
+        return new HtmlString($parsedown->text($text));
     }
 
     /**
@@ -130,14 +112,14 @@ class Markdown
     }
 
     /**
-     * Get the text component paths.
+     * Get the Markdown component paths.
      *
      * @return array
      */
-    public function textComponentPaths()
+    public function markdownComponentPaths()
     {
         return array_map(function ($path) {
-            return $path.'/text';
+            return $path.'/markdown';
         }, $this->componentPaths());
     }
 
@@ -162,28 +144,5 @@ class Markdown
     public function loadComponentsFrom(array $paths = [])
     {
         $this->componentPaths = $paths;
-    }
-
-    /**
-     * Set the default theme to be used.
-     *
-     * @param  string  $theme
-     * @return $this
-     */
-    public function theme($theme)
-    {
-        $this->theme = $theme;
-
-        return $this;
-    }
-
-    /**
-     * Get the theme currently being used by the renderer.
-     *
-     * @return string
-     */
-    public function getTheme()
-    {
-        return $this->theme;
     }
 }

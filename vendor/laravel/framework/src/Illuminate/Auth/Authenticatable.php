@@ -32,16 +32,6 @@ trait Authenticatable
     }
 
     /**
-     * Get the unique broadcast identifier for the user.
-     *
-     * @return mixed
-     */
-    public function getAuthIdentifierForBroadcasting()
-    {
-        return $this->getAuthIdentifier();
-    }
-
-    /**
      * Get the password for the user.
      *
      * @return string
@@ -54,12 +44,12 @@ trait Authenticatable
     /**
      * Get the token value for the "remember me" session.
      *
-     * @return string|null
+     * @return string
      */
     public function getRememberToken()
     {
         if (! empty($this->getRememberTokenName())) {
-            return (string) $this->{$this->getRememberTokenName()};
+            return $this->{$this->getRememberTokenName()};
         }
     }
 

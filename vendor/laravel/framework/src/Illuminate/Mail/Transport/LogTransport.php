@@ -2,13 +2,11 @@
 
 namespace Illuminate\Mail\Transport;
 
+use Swift_Mime_Message;
+use Swift_Mime_MimeEntity;
 use Psr\Log\LoggerInterface;
-use Symfony\Component\Mailer\Envelope;
-use Symfony\Component\Mailer\SentMessage;
-use Symfony\Component\Mailer\Transport\TransportInterface;
-use Symfony\Component\Mime\RawMessage;
 
-class LogTransport implements TransportInterface
+class LogTransport extends Transport
 {
     /**
      * The Logger instance.
@@ -31,36 +29,31 @@ class LogTransport implements TransportInterface
     /**
      * {@inheritdoc}
      */
-    public function send(RawMessage $message, Envelope $envelope = null): ?SentMessage
+    public function send(Swift_Mime_Message $message, &$failedRecipients = null)
     {
-        $string = $message->toString();
+        $this->beforeSendPerformed($message);
 
-        if (str_contains($string, 'Content-Transfer-Encoding: quoted-printable')) {
-            $string = quoted_printable_decode($string);
-        }
+        $this->logger->debug($this->getMimeEntityString($message));
 
-        $this->logger->debug($string);
+        $this->sendPerformed($message);
 
-        return new SentMessage($message, $envelope ?? Envelope::create($message));
+        return $this->numberOfRecipients($message);
     }
 
     /**
-     * Get the logger for the LogTransport instance.
+     * Get a loggable string out of a Swiftmailer entity.
      *
-     * @return \Psr\Log\LoggerInterface
-     */
-    public function logger()
-    {
-        return $this->logger;
-    }
-
-    /**
-     * Get the string representation of the transport.
-     *
+     * @param  \Swift_Mime_MimeEntity $entity
      * @return string
      */
-    public function __toString(): string
+    protected function getMimeEntityString(Swift_Mime_MimeEntity $entity)
     {
-        return 'log';
+        $string = (string) $entity->getHeaders().PHP_EOL.$entity->getBody();
+
+        foreach ($entity->getChildren() as $children) {
+            $string .= PHP_EOL.PHP_EOL.$this->getMimeEntityString($children);
+        }
+
+        return $string;
     }
 }

@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace PhpParser\Node\Scalar;
 
@@ -15,24 +15,13 @@ class DNumber extends Scalar
      * @param float $value      Value of the number
      * @param array $attributes Additional attributes
      */
-    public function __construct(float $value, array $attributes = []) {
-        $this->attributes = $attributes;
+    public function __construct($value, array $attributes = array()) {
+        parent::__construct($attributes);
         $this->value = $value;
     }
 
-    public function getSubNodeNames() : array {
-        return ['value'];
-    }
-
-    /**
-     * @param mixed[] $attributes
-     */
-    public static function fromString(string $str, array $attributes = []): DNumber
-    {
-        $attributes['rawValue'] = $str;
-        $float = self::parse($str);
-
-        return new DNumber($float, $attributes);
+    public function getSubNodeNames() {
+        return array('value');
     }
 
     /**
@@ -44,10 +33,14 @@ class DNumber extends Scalar
      *
      * @return float The parsed number
      */
-    public static function parse(string $str) : float {
-        $str = str_replace('_', '', $str);
+    public static function parse($str) {
+        // if string contains any of .eE just cast it to float
+        if (false !== strpbrk($str, '.eE')) {
+            return (float) $str;
+        }
 
-        // Check whether this is one of the special integer notations.
+        // otherwise it's an integer notation that overflowed into a float
+        // if it starts with 0 it's one of the special integer notations
         if ('0' === $str[0]) {
             // hex
             if ('x' === $str[1] || 'X' === $str[1]) {
@@ -59,19 +52,13 @@ class DNumber extends Scalar
                 return bindec($str);
             }
 
-            // oct, but only if the string does not contain any of '.eE'.
-            if (false === strpbrk($str, '.eE')) {
-                // substr($str, 0, strcspn($str, '89')) cuts the string at the first invalid digit
-                // (8 or 9) so that only the digits before that are used.
-                return octdec(substr($str, 0, strcspn($str, '89')));
-            }
+            // oct
+            // substr($str, 0, strcspn($str, '89')) cuts the string at the first invalid digit (8 or 9)
+            // so that only the digits before that are used
+            return octdec(substr($str, 0, strcspn($str, '89')));
         }
 
         // dec
         return (float) $str;
-    }
-
-    public function getType() : string {
-        return 'Scalar_DNumber';
     }
 }

@@ -11,23 +11,30 @@
 
 namespace Symfony\Component\HttpKernel\EventListener;
 
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
+use Psr\Container\ContainerInterface;
 
 /**
  * Sets the session in the request.
  *
  * @author Fabien Potencier <fabien@symfony.com>
  *
- * @final
+ * @final since version 3.3
  */
 class SessionListener extends AbstractSessionListener
 {
-    protected function getSession(): ?SessionInterface
+    private $container;
+
+    public function __construct(ContainerInterface $container)
     {
-        if ($this->container->has('session_factory')) {
-            return $this->container->get('session_factory')->createSession();
+        $this->container = $container;
+    }
+
+    protected function getSession()
+    {
+        if (!$this->container->has('session')) {
+            return null;
         }
 
-        return null;
+        return $this->container->get('session');
     }
 }

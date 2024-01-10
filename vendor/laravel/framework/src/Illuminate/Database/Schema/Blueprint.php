@@ -2,15 +2,11 @@
 
 namespace Illuminate\Database\Schema;
 
-use BadMethodCallException;
 use Closure;
-use Illuminate\Database\Connection;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
-use Illuminate\Database\Query\Expression;
-use Illuminate\Database\Schema\Grammars\Grammar;
-use Illuminate\Database\SQLiteConnection;
 use Illuminate\Support\Fluent;
+use Illuminate\Database\Connection;
 use Illuminate\Support\Traits\Macroable;
+use Illuminate\Database\Schema\Grammars\Grammar;
 
 class Blueprint
 {
@@ -24,23 +20,16 @@ class Blueprint
     protected $table;
 
     /**
-     * The prefix of the table.
-     *
-     * @var string
-     */
-    protected $prefix;
-
-    /**
      * The columns that should be added to the table.
      *
-     * @var \Illuminate\Database\Schema\ColumnDefinition[]
+     * @var array
      */
     protected $columns = [];
 
     /**
      * The commands that should be run for the table.
      *
-     * @var \Illuminate\Support\Fluent[]
+     * @var array
      */
     protected $commands = [];
 
@@ -53,15 +42,11 @@ class Blueprint
 
     /**
      * The default character set that should be used for the table.
-     *
-     * @var string
      */
     public $charset;
 
     /**
      * The collation that should be used for the table.
-     *
-     * @var string
      */
     public $collation;
 
@@ -73,24 +58,15 @@ class Blueprint
     public $temporary = false;
 
     /**
-     * The column to add new columns after.
-     *
-     * @var string
-     */
-    public $after;
-
-    /**
      * Create a new schema blueprint.
      *
      * @param  string  $table
      * @param  \Closure|null  $callback
-     * @param  string  $prefix
      * @return void
      */
-    public function __construct($table, Closure $callback = null, $prefix = '')
+    public function __construct($table, Closure $callback = null)
     {
         $this->table = $table;
-        $this->prefix = $prefix;
 
         if (! is_null($callback)) {
             $callback($this);
@@ -101,7 +77,7 @@ class Blueprint
      * Execute the blueprint against the database.
      *
      * @param  \Illuminate\Database\Connection  $connection
-     * @param  \Illuminate\Database\Schema\Grammars\Grammar  $grammar
+     * @param  \Illuminate\Database\Schema\Grammars\Grammar $grammar
      * @return void
      */
     public function build(Connection $connection, Grammar $grammar)
@@ -120,23 +96,17 @@ class Blueprint
      */
     public function toSql(Connection $connection, Grammar $grammar)
     {
-        $this->addImpliedCommands($connection, $grammar);
+        $this->addImpliedCommands();
 
         $statements = [];
 
         // Each type of command has a corresponding compiler function on the schema
         // grammar which is used to build the necessary SQL statements to build
         // the blueprint element, so we'll just call that compilers function.
-        $this->ensureCommandsAreValid($connection);
-
         foreach ($this->commands as $command) {
-            if ($command->shouldBeSkipped) {
-                continue;
-            }
-
             $method = 'compile'.ucfirst($command->name);
 
-            if (method_exists($grammar, $method) || $grammar::hasMacro($method)) {
+            if (method_exists($grammar, $method)) {
                 if (! is_null($sql = $grammar->$method($this, $command, $connection))) {
                     $statements = array_merge($statements, (array) $sql);
                 }
@@ -147,52 +117,11 @@ class Blueprint
     }
 
     /**
-     * Ensure the commands on the blueprint are valid for the connection type.
-     *
-     * @param  \Illuminate\Database\Connection  $connection
-     * @return void
-     *
-     * @throws \BadMethodCallException
-     */
-    protected function ensureCommandsAreValid(Connection $connection)
-    {
-        if ($connection instanceof SQLiteConnection) {
-            if ($this->commandsNamed(['dropColumn', 'renameColumn'])->count() > 1
-                && ! $connection->usingNativeSchemaOperations()) {
-                throw new BadMethodCallException(
-                    "SQLite doesn't support multiple calls to dropColumn / renameColumn in a single modification."
-                );
-            }
-
-            if ($this->commandsNamed(['dropForeign'])->count() > 0) {
-                throw new BadMethodCallException(
-                    "SQLite doesn't support dropping foreign keys (you would need to re-create the table)."
-                );
-            }
-        }
-    }
-
-    /**
-     * Get all of the commands matching the given names.
-     *
-     * @param  array  $names
-     * @return \Illuminate\Support\Collection
-     */
-    protected function commandsNamed(array $names)
-    {
-        return collect($this->commands)->filter(function ($command) use ($names) {
-            return in_array($command->name, $names);
-        });
-    }
-
-    /**
      * Add the commands that are implied by the blueprint's state.
      *
-     * @param  \Illuminate\Database\Connection  $connection
-     * @param  \Illuminate\Database\Schema\Grammars\Grammar  $grammar
      * @return void
      */
-    protected function addImpliedCommands(Connection $connection, Grammar $grammar)
+    protected function addImpliedCommands()
     {
         if (count($this->getAddedColumns()) > 0 && ! $this->creating()) {
             array_unshift($this->commands, $this->createCommand('add'));
@@ -203,8 +132,6 @@ class Blueprint
         }
 
         $this->addFluentIndexes();
-
-        $this->addFluentCommands($connection, $grammar);
     }
 
     /**
@@ -215,23 +142,12 @@ class Blueprint
     protected function addFluentIndexes()
     {
         foreach ($this->columns as $column) {
-            foreach (['primary', 'unique', 'index', 'fulltext', 'fullText', 'spatialIndex'] as $index) {
+            foreach (['primary', 'unique', 'index'] as $index) {
                 // If the index has been specified on the given column, but is simply equal
                 // to "true" (boolean), no name has been specified for this index so the
                 // index method can be called without a name and it will generate one.
                 if ($column->{$index} === true) {
                     $this->{$index}($column->name);
-                    $column->{$index} = null;
-
-                    continue 2;
-                }
-
-                // If the index has been specified on the given column, but it equals false
-                // and the column is supposed to be changed, we will call the drop index
-                // method with an array of column to drop it by its conventional name.
-                elseif ($column->{$index} === false && $column->change) {
-                    $this->{'drop'.ucfirst($index)}([$column->name]);
-                    $column->{$index} = null;
 
                     continue 2;
                 }
@@ -241,30 +157,9 @@ class Blueprint
                 // the index since the developer specified the explicit name for this.
                 elseif (isset($column->{$index})) {
                     $this->{$index}($column->name, $column->{$index});
-                    $column->{$index} = null;
 
                     continue 2;
                 }
-            }
-        }
-    }
-
-    /**
-     * Add the fluent commands specified on any columns.
-     *
-     * @param  \Illuminate\Database\Connection  $connection
-     * @param  \Illuminate\Database\Schema\Grammars\Grammar  $grammar
-     * @return void
-     */
-    public function addFluentCommands(Connection $connection, Grammar $grammar)
-    {
-        foreach ($this->columns as $column) {
-            if ($column->change && ! $connection->usingNativeSchemaOperations()) {
-                continue;
-            }
-
-            foreach ($grammar->getFluentCommands() as $commandName) {
-                $this->addCommand($commandName, compact('column'));
             }
         }
     }
@@ -274,10 +169,10 @@ class Blueprint
      *
      * @return bool
      */
-    public function creating()
+    protected function creating()
     {
         return collect($this->commands)->contains(function ($command) {
-            return $command->name === 'create';
+            return $command->name == 'create';
         });
     }
 
@@ -289,50 +184,6 @@ class Blueprint
     public function create()
     {
         return $this->addCommand('create');
-    }
-
-    /**
-     * Specify the storage engine that should be used for the table.
-     *
-     * @param  string  $engine
-     * @return void
-     */
-    public function engine($engine)
-    {
-        $this->engine = $engine;
-    }
-
-    /**
-     * Specify that the InnoDB storage engine should be used for the table (MySQL only).
-     *
-     * @param  string  $engine
-     * @return void
-     */
-    public function innoDb()
-    {
-        $this->engine('InnoDB');
-    }
-
-    /**
-     * Specify the character set that should be used for the table.
-     *
-     * @param  string  $charset
-     * @return void
-     */
-    public function charset($charset)
-    {
-        $this->charset = $charset;
-    }
-
-    /**
-     * Specify the collation that should be used for the table.
-     *
-     * @param  string  $collation
-     * @return void
-     */
-    public function collation($collation)
-    {
-        $this->collation = $collation;
     }
 
     /**
@@ -373,7 +224,7 @@ class Blueprint
      */
     public function dropColumn($columns)
     {
-        $columns = is_array($columns) ? $columns : func_get_args();
+        $columns = is_array($columns) ? $columns : (array) func_get_args();
 
         return $this->addCommand('dropColumn', compact('columns'));
     }
@@ -393,7 +244,7 @@ class Blueprint
     /**
      * Indicate that the given primary key should be dropped.
      *
-     * @param  string|array|null  $index
+     * @param  string|array  $index
      * @return \Illuminate\Support\Fluent
      */
     public function dropPrimary($index = null)
@@ -424,28 +275,6 @@ class Blueprint
     }
 
     /**
-     * Indicate that the given fulltext index should be dropped.
-     *
-     * @param  string|array  $index
-     * @return \Illuminate\Support\Fluent
-     */
-    public function dropFullText($index)
-    {
-        return $this->dropIndexCommand('dropFullText', 'fulltext', $index);
-    }
-
-    /**
-     * Indicate that the given spatial index should be dropped.
-     *
-     * @param  string|array  $index
-     * @return \Illuminate\Support\Fluent
-     */
-    public function dropSpatialIndex($index)
-    {
-        return $this->dropIndexCommand('dropSpatialIndex', 'spatialIndex', $index);
-    }
-
-    /**
      * Indicate that the given foreign key should be dropped.
      *
      * @param  string|array  $index
@@ -454,63 +283,6 @@ class Blueprint
     public function dropForeign($index)
     {
         return $this->dropIndexCommand('dropForeign', 'foreign', $index);
-    }
-
-    /**
-     * Indicate that the given column and foreign key should be dropped.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Support\Fluent
-     */
-    public function dropConstrainedForeignId($column)
-    {
-        $this->dropForeign([$column]);
-
-        return $this->dropColumn($column);
-    }
-
-    /**
-     * Indicate that the given foreign key should be dropped.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model|string  $model
-     * @param  string|null  $column
-     * @return \Illuminate\Support\Fluent
-     */
-    public function dropForeignIdFor($model, $column = null)
-    {
-        if (is_string($model)) {
-            $model = new $model;
-        }
-
-        return $this->dropForeign([$column ?: $model->getForeignKey()]);
-    }
-
-    /**
-     * Indicate that the given foreign key should be dropped.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model|string  $model
-     * @param  string|null  $column
-     * @return \Illuminate\Support\Fluent
-     */
-    public function dropConstrainedForeignIdFor($model, $column = null)
-    {
-        if (is_string($model)) {
-            $model = new $model;
-        }
-
-        return $this->dropConstrainedForeignId($column ?: $model->getForeignKey());
-    }
-
-    /**
-     * Indicate that the given indexes should be renamed.
-     *
-     * @param  string  $from
-     * @param  string  $to
-     * @return \Illuminate\Support\Fluent
-     */
-    public function renameIndex($from, $to)
-    {
-        return $this->addCommand('renameIndex', compact('from', 'to'));
     }
 
     /**
@@ -536,23 +308,21 @@ class Blueprint
     /**
      * Indicate that the soft delete column should be dropped.
      *
-     * @param  string  $column
      * @return void
      */
-    public function dropSoftDeletes($column = 'deleted_at')
+    public function dropSoftDeletes()
     {
-        $this->dropColumn($column);
+        $this->dropColumn('deleted_at');
     }
 
     /**
      * Indicate that the soft delete column should be dropped.
      *
-     * @param  string  $column
      * @return void
      */
-    public function dropSoftDeletesTz($column = 'deleted_at')
+    public function dropSoftDeletesTz()
     {
-        $this->dropSoftDeletes($column);
+        $this->dropSoftDeletes();
     }
 
     /**
@@ -563,20 +333,6 @@ class Blueprint
     public function dropRememberToken()
     {
         $this->dropColumn('remember_token');
-    }
-
-    /**
-     * Indicate that the polymorphic columns should be dropped.
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function dropMorphs($name, $indexName = null)
-    {
-        $this->dropIndex($indexName ?: $this->createIndexName('index', ["{$name}_type", "{$name}_id"]));
-
-        $this->dropColumn("{$name}_type", "{$name}_id");
     }
 
     /**
@@ -594,9 +350,9 @@ class Blueprint
      * Specify the primary key(s) for the table.
      *
      * @param  string|array  $columns
-     * @param  string|null  $name
+     * @param  string  $name
      * @param  string|null  $algorithm
-     * @return \Illuminate\Database\Schema\IndexDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function primary($columns, $name = null, $algorithm = null)
     {
@@ -607,9 +363,9 @@ class Blueprint
      * Specify a unique index for the table.
      *
      * @param  string|array  $columns
-     * @param  string|null  $name
+     * @param  string  $name
      * @param  string|null  $algorithm
-     * @return \Illuminate\Database\Schema\IndexDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unique($columns, $name = null, $algorithm = null)
     {
@@ -620,9 +376,9 @@ class Blueprint
      * Specify an index for the table.
      *
      * @param  string|array  $columns
-     * @param  string|null  $name
+     * @param  string  $name
      * @param  string|null  $algorithm
-     * @return \Illuminate\Database\Schema\IndexDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function index($columns, $name = null, $algorithm = null)
     {
@@ -630,89 +386,24 @@ class Blueprint
     }
 
     /**
-     * Specify an fulltext for the table.
-     *
-     * @param  string|array  $columns
-     * @param  string|null  $name
-     * @param  string|null  $algorithm
-     * @return \Illuminate\Database\Schema\IndexDefinition
-     */
-    public function fullText($columns, $name = null, $algorithm = null)
-    {
-        return $this->indexCommand('fulltext', $columns, $name, $algorithm);
-    }
-
-    /**
-     * Specify a spatial index for the table.
-     *
-     * @param  string|array  $columns
-     * @param  string|null  $name
-     * @return \Illuminate\Database\Schema\IndexDefinition
-     */
-    public function spatialIndex($columns, $name = null)
-    {
-        return $this->indexCommand('spatialIndex', $columns, $name);
-    }
-
-    /**
-     * Specify a raw index for the table.
-     *
-     * @param  string  $expression
-     * @param  string  $name
-     * @return \Illuminate\Database\Schema\IndexDefinition
-     */
-    public function rawIndex($expression, $name)
-    {
-        return $this->index([new Expression($expression)], $name);
-    }
-
-    /**
      * Specify a foreign key for the table.
      *
      * @param  string|array  $columns
-     * @param  string|null  $name
-     * @return \Illuminate\Database\Schema\ForeignKeyDefinition
+     * @param  string  $name
+     * @return \Illuminate\Support\Fluent
      */
     public function foreign($columns, $name = null)
     {
-        $command = new ForeignKeyDefinition(
-            $this->indexCommand('foreign', $columns, $name)->getAttributes()
-        );
-
-        $this->commands[count($this->commands) - 1] = $command;
-
-        return $command;
-    }
-
-    /**
-     * Create a new auto-incrementing big integer (8-byte) column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function id($column = 'id')
-    {
-        return $this->bigIncrements($column);
+        return $this->indexCommand('foreign', $columns, $name);
     }
 
     /**
      * Create a new auto-incrementing integer (4-byte) column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function increments($column)
-    {
-        return $this->unsignedInteger($column, true);
-    }
-
-    /**
-     * Create a new auto-incrementing integer (4-byte) column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function integerIncrements($column)
     {
         return $this->unsignedInteger($column, true);
     }
@@ -721,7 +412,7 @@ class Blueprint
      * Create a new auto-incrementing tiny integer (1-byte) column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function tinyIncrements($column)
     {
@@ -732,7 +423,7 @@ class Blueprint
      * Create a new auto-incrementing small integer (2-byte) column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function smallIncrements($column)
     {
@@ -743,7 +434,7 @@ class Blueprint
      * Create a new auto-incrementing medium integer (3-byte) column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function mediumIncrements($column)
     {
@@ -754,7 +445,7 @@ class Blueprint
      * Create a new auto-incrementing big integer (8-byte) column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function bigIncrements($column)
     {
@@ -765,12 +456,12 @@ class Blueprint
      * Create a new char column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $length
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  int  $length
+     * @return \Illuminate\Support\Fluent
      */
     public function char($column, $length = null)
     {
-        $length = ! is_null($length) ? $length : Builder::$defaultStringLength;
+        $length = $length ?: Builder::$defaultStringLength;
 
         return $this->addColumn('char', $column, compact('length'));
     }
@@ -779,8 +470,8 @@ class Blueprint
      * Create a new string column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $length
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  int  $length
+     * @return \Illuminate\Support\Fluent
      */
     public function string($column, $length = null)
     {
@@ -790,21 +481,10 @@ class Blueprint
     }
 
     /**
-     * Create a new tiny text column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function tinyText($column)
-    {
-        return $this->addColumn('tinyText', $column);
-    }
-
-    /**
      * Create a new text column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function text($column)
     {
@@ -815,7 +495,7 @@ class Blueprint
      * Create a new medium text column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function mediumText($column)
     {
@@ -826,7 +506,7 @@ class Blueprint
      * Create a new long text column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function longText($column)
     {
@@ -839,7 +519,7 @@ class Blueprint
      * @param  string  $column
      * @param  bool  $autoIncrement
      * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function integer($column, $autoIncrement = false, $unsigned = false)
     {
@@ -852,7 +532,7 @@ class Blueprint
      * @param  string  $column
      * @param  bool  $autoIncrement
      * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function tinyInteger($column, $autoIncrement = false, $unsigned = false)
     {
@@ -865,7 +545,7 @@ class Blueprint
      * @param  string  $column
      * @param  bool  $autoIncrement
      * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function smallInteger($column, $autoIncrement = false, $unsigned = false)
     {
@@ -878,7 +558,7 @@ class Blueprint
      * @param  string  $column
      * @param  bool  $autoIncrement
      * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function mediumInteger($column, $autoIncrement = false, $unsigned = false)
     {
@@ -891,7 +571,7 @@ class Blueprint
      * @param  string  $column
      * @param  bool  $autoIncrement
      * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function bigInteger($column, $autoIncrement = false, $unsigned = false)
     {
@@ -903,7 +583,7 @@ class Blueprint
      *
      * @param  string  $column
      * @param  bool  $autoIncrement
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedInteger($column, $autoIncrement = false)
     {
@@ -915,7 +595,7 @@ class Blueprint
      *
      * @param  string  $column
      * @param  bool  $autoIncrement
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedTinyInteger($column, $autoIncrement = false)
     {
@@ -927,7 +607,7 @@ class Blueprint
      *
      * @param  string  $column
      * @param  bool  $autoIncrement
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedSmallInteger($column, $autoIncrement = false)
     {
@@ -939,7 +619,7 @@ class Blueprint
      *
      * @param  string  $column
      * @param  bool  $autoIncrement
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedMediumInteger($column, $autoIncrement = false)
     {
@@ -951,7 +631,7 @@ class Blueprint
      *
      * @param  string  $column
      * @param  bool  $autoIncrement
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedBigInteger($column, $autoIncrement = false)
     {
@@ -959,115 +639,42 @@ class Blueprint
     }
 
     /**
-     * Create a new unsigned big integer (8-byte) column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ForeignIdColumnDefinition
-     */
-    public function foreignId($column)
-    {
-        return $this->addColumnDefinition(new ForeignIdColumnDefinition($this, [
-            'type' => 'bigInteger',
-            'name' => $column,
-            'autoIncrement' => false,
-            'unsigned' => true,
-        ]));
-    }
-
-    /**
-     * Create a foreign ID column for the given model.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model|string  $model
-     * @param  string|null  $column
-     * @return \Illuminate\Database\Schema\ForeignIdColumnDefinition
-     */
-    public function foreignIdFor($model, $column = null)
-    {
-        if (is_string($model)) {
-            $model = new $model;
-        }
-
-        $column = $column ?: $model->getForeignKey();
-
-        if ($model->getKeyType() === 'int' && $model->getIncrementing()) {
-            return $this->foreignId($column);
-        }
-
-        $modelTraits = class_uses_recursive($model);
-
-        if (in_array(HasUlids::class, $modelTraits, true)) {
-            return $this->foreignUlid($column);
-        }
-
-        return $this->foreignUuid($column);
-    }
-
-    /**
      * Create a new float column on the table.
      *
      * @param  string  $column
-     * @param  int  $total
-     * @param  int  $places
-     * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  int     $total
+     * @param  int     $places
+     * @return \Illuminate\Support\Fluent
      */
-    public function float($column, $total = 8, $places = 2, $unsigned = false)
+    public function float($column, $total = 8, $places = 2)
     {
-        return $this->addColumn('float', $column, compact('total', 'places', 'unsigned'));
+        return $this->addColumn('float', $column, compact('total', 'places'));
     }
 
     /**
      * Create a new double column on the table.
      *
-     * @param  string  $column
-     * @param  int|null  $total
-     * @param  int|null  $places
-     * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  string   $column
+     * @param  int|null    $total
+     * @param  int|null $places
+     * @return \Illuminate\Support\Fluent
      */
-    public function double($column, $total = null, $places = null, $unsigned = false)
+    public function double($column, $total = null, $places = null)
     {
-        return $this->addColumn('double', $column, compact('total', 'places', 'unsigned'));
+        return $this->addColumn('double', $column, compact('total', 'places'));
     }
 
     /**
      * Create a new decimal column on the table.
      *
      * @param  string  $column
-     * @param  int  $total
-     * @param  int  $places
-     * @param  bool  $unsigned
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  int     $total
+     * @param  int     $places
+     * @return \Illuminate\Support\Fluent
      */
-    public function decimal($column, $total = 8, $places = 2, $unsigned = false)
+    public function decimal($column, $total = 8, $places = 2)
     {
-        return $this->addColumn('decimal', $column, compact('total', 'places', 'unsigned'));
-    }
-
-    /**
-     * Create a new unsigned float column on the table.
-     *
-     * @param  string  $column
-     * @param  int  $total
-     * @param  int  $places
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function unsignedFloat($column, $total = 8, $places = 2)
-    {
-        return $this->float($column, $total, $places, true);
-    }
-
-    /**
-     * Create a new unsigned double column on the table.
-     *
-     * @param  string  $column
-     * @param  int  $total
-     * @param  int  $places
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function unsignedDouble($column, $total = null, $places = null)
-    {
-        return $this->double($column, $total, $places, true);
+        return $this->addColumn('decimal', $column, compact('total', 'places'));
     }
 
     /**
@@ -1076,18 +683,20 @@ class Blueprint
      * @param  string  $column
      * @param  int  $total
      * @param  int  $places
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function unsignedDecimal($column, $total = 8, $places = 2)
     {
-        return $this->decimal($column, $total, $places, true);
+        return $this->addColumn('decimal', $column, [
+            'total' => $total, 'places' => $places, 'unsigned' => true,
+        ]);
     }
 
     /**
      * Create a new boolean column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function boolean($column)
     {
@@ -1098,8 +707,8 @@ class Blueprint
      * Create a new enum column on the table.
      *
      * @param  string  $column
-     * @param  array  $allowed
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  array   $allowed
+     * @return \Illuminate\Support\Fluent
      */
     public function enum($column, array $allowed)
     {
@@ -1107,22 +716,10 @@ class Blueprint
     }
 
     /**
-     * Create a new set column on the table.
-     *
-     * @param  string  $column
-     * @param  array  $allowed
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function set($column, array $allowed)
-    {
-        return $this->addColumn('set', $column, compact('allowed'));
-    }
-
-    /**
      * Create a new json column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function json($column)
     {
@@ -1133,7 +730,7 @@ class Blueprint
      * Create a new jsonb column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function jsonb($column)
     {
@@ -1144,7 +741,7 @@ class Blueprint
      * Create a new date column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function date($column)
     {
@@ -1155,85 +752,78 @@ class Blueprint
      * Create a new date-time column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function dateTime($column, $precision = 0)
+    public function dateTime($column)
     {
-        return $this->addColumn('dateTime', $column, compact('precision'));
+        return $this->addColumn('dateTime', $column);
     }
 
     /**
      * Create a new date-time column (with time zone) on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function dateTimeTz($column, $precision = 0)
+    public function dateTimeTz($column)
     {
-        return $this->addColumn('dateTimeTz', $column, compact('precision'));
+        return $this->addColumn('dateTimeTz', $column);
     }
 
     /**
      * Create a new time column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function time($column, $precision = 0)
+    public function time($column)
     {
-        return $this->addColumn('time', $column, compact('precision'));
+        return $this->addColumn('time', $column);
     }
 
     /**
      * Create a new time column (with time zone) on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function timeTz($column, $precision = 0)
+    public function timeTz($column)
     {
-        return $this->addColumn('timeTz', $column, compact('precision'));
+        return $this->addColumn('timeTz', $column);
     }
 
     /**
      * Create a new timestamp column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function timestamp($column, $precision = 0)
+    public function timestamp($column)
     {
-        return $this->addColumn('timestamp', $column, compact('precision'));
+        return $this->addColumn('timestamp', $column);
     }
 
     /**
      * Create a new timestamp (with time zone) column on the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function timestampTz($column, $precision = 0)
+    public function timestampTz($column)
     {
-        return $this->addColumn('timestampTz', $column, compact('precision'));
+        return $this->addColumn('timestampTz', $column);
     }
 
     /**
      * Add nullable creation and update timestamps to the table.
      *
-     * @param  int|null  $precision
      * @return void
      */
-    public function timestamps($precision = 0)
+    public function timestamps()
     {
-        $this->timestamp('created_at', $precision)->nullable();
+        $this->timestamp('created_at')->nullable();
 
-        $this->timestamp('updated_at', $precision)->nullable();
+        $this->timestamp('updated_at')->nullable();
     }
 
     /**
@@ -1241,92 +831,51 @@ class Blueprint
      *
      * Alias for self::timestamps().
      *
-     * @param  int|null  $precision
      * @return void
      */
-    public function nullableTimestamps($precision = 0)
+    public function nullableTimestamps()
     {
-        $this->timestamps($precision);
+        $this->timestamps();
     }
 
     /**
      * Add creation and update timestampTz columns to the table.
      *
-     * @param  int|null  $precision
      * @return void
      */
-    public function timestampsTz($precision = 0)
+    public function timestampsTz()
     {
-        $this->timestampTz('created_at', $precision)->nullable();
+        $this->timestampTz('created_at')->nullable();
 
-        $this->timestampTz('updated_at', $precision)->nullable();
-    }
-
-    /**
-     * Add creation and update datetime columns to the table.
-     *
-     * @param  int|null  $precision
-     * @return void
-     */
-    public function datetimes($precision = 0)
-    {
-        $this->datetime('created_at', $precision)->nullable();
-
-        $this->datetime('updated_at', $precision)->nullable();
+        $this->timestampTz('updated_at')->nullable();
     }
 
     /**
      * Add a "deleted at" timestamp for the table.
      *
      * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function softDeletes($column = 'deleted_at', $precision = 0)
+    public function softDeletes($column = 'deleted_at')
     {
-        return $this->timestamp($column, $precision)->nullable();
+        return $this->timestamp($column)->nullable();
     }
 
     /**
      * Add a "deleted at" timestampTz for the table.
      *
-     * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function softDeletesTz($column = 'deleted_at', $precision = 0)
+    public function softDeletesTz()
     {
-        return $this->timestampTz($column, $precision)->nullable();
-    }
-
-    /**
-     * Add a "deleted at" datetime column to the table.
-     *
-     * @param  string  $column
-     * @param  int|null  $precision
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function softDeletesDatetime($column = 'deleted_at', $precision = 0)
-    {
-        return $this->datetime($column, $precision)->nullable();
-    }
-
-    /**
-     * Create a new year column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function year($column)
-    {
-        return $this->addColumn('year', $column);
+        return $this->timestampTz('deleted_at')->nullable();
     }
 
     /**
      * Create a new binary column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function binary($column)
     {
@@ -1334,65 +883,23 @@ class Blueprint
     }
 
     /**
-     * Create a new UUID column on the table.
+     * Create a new uuid column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function uuid($column = 'uuid')
+    public function uuid($column)
     {
         return $this->addColumn('uuid', $column);
-    }
-
-    /**
-     * Create a new UUID column on the table with a foreign key constraint.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ForeignIdColumnDefinition
-     */
-    public function foreignUuid($column)
-    {
-        return $this->addColumnDefinition(new ForeignIdColumnDefinition($this, [
-            'type' => 'uuid',
-            'name' => $column,
-        ]));
-    }
-
-    /**
-     * Create a new ULID column on the table.
-     *
-     * @param  string  $column
-     * @param  int|null  $length
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function ulid($column = 'ulid', $length = 26)
-    {
-        return $this->char($column, $length);
-    }
-
-    /**
-     * Create a new ULID column on the table with a foreign key constraint.
-     *
-     * @param  string  $column
-     * @param  int|null  $length
-     * @return \Illuminate\Database\Schema\ForeignIdColumnDefinition
-     */
-    public function foreignUlid($column, $length = 26)
-    {
-        return $this->addColumnDefinition(new ForeignIdColumnDefinition($this, [
-            'type' => 'char',
-            'name' => $column,
-            'length' => $length,
-        ]));
     }
 
     /**
      * Create a new IP address column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function ipAddress($column = 'ip_address')
+    public function ipAddress($column)
     {
         return $this->addColumn('ipAddress', $column);
     }
@@ -1401,123 +908,11 @@ class Blueprint
      * Create a new MAC address column on the table.
      *
      * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
-    public function macAddress($column = 'mac_address')
+    public function macAddress($column)
     {
         return $this->addColumn('macAddress', $column);
-    }
-
-    /**
-     * Create a new geometry column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function geometry($column)
-    {
-        return $this->addColumn('geometry', $column);
-    }
-
-    /**
-     * Create a new point column on the table.
-     *
-     * @param  string  $column
-     * @param  int|null  $srid
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function point($column, $srid = null)
-    {
-        return $this->addColumn('point', $column, compact('srid'));
-    }
-
-    /**
-     * Create a new linestring column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function lineString($column)
-    {
-        return $this->addColumn('linestring', $column);
-    }
-
-    /**
-     * Create a new polygon column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function polygon($column)
-    {
-        return $this->addColumn('polygon', $column);
-    }
-
-    /**
-     * Create a new geometrycollection column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function geometryCollection($column)
-    {
-        return $this->addColumn('geometrycollection', $column);
-    }
-
-    /**
-     * Create a new multipoint column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function multiPoint($column)
-    {
-        return $this->addColumn('multipoint', $column);
-    }
-
-    /**
-     * Create a new multilinestring column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function multiLineString($column)
-    {
-        return $this->addColumn('multilinestring', $column);
-    }
-
-    /**
-     * Create a new multipolygon column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function multiPolygon($column)
-    {
-        return $this->addColumn('multipolygon', $column);
-    }
-
-    /**
-     * Create a new multipolygon column on the table.
-     *
-     * @param  string  $column
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function multiPolygonZ($column)
-    {
-        return $this->addColumn('multipolygonz', $column);
-    }
-
-    /**
-     * Create a new generated, computed column on the table.
-     *
-     * @param  string  $column
-     * @param  string  $expression
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    public function computed($column, $expression)
-    {
-        return $this->addColumn('computed', $column, compact('expression'));
     }
 
     /**
@@ -1529,13 +924,11 @@ class Blueprint
      */
     public function morphs($name, $indexName = null)
     {
-        if (Builder::$defaultMorphKeyType === 'uuid') {
-            $this->uuidMorphs($name, $indexName);
-        } elseif (Builder::$defaultMorphKeyType === 'ulid') {
-            $this->ulidMorphs($name, $indexName);
-        } else {
-            $this->numericMorphs($name, $indexName);
-        }
+        $this->unsignedInteger("{$name}_id");
+
+        $this->string("{$name}_type");
+
+        $this->index(["{$name}_id", "{$name}_type"], $indexName);
     }
 
     /**
@@ -1547,115 +940,17 @@ class Blueprint
      */
     public function nullableMorphs($name, $indexName = null)
     {
-        if (Builder::$defaultMorphKeyType === 'uuid') {
-            $this->nullableUuidMorphs($name, $indexName);
-        } elseif (Builder::$defaultMorphKeyType === 'ulid') {
-            $this->nullableUlidMorphs($name, $indexName);
-        } else {
-            $this->nullableNumericMorphs($name, $indexName);
-        }
-    }
+        $this->unsignedInteger("{$name}_id")->nullable();
 
-    /**
-     * Add the proper columns for a polymorphic table using numeric IDs (incremental).
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function numericMorphs($name, $indexName = null)
-    {
-        $this->string("{$name}_type");
-
-        $this->unsignedBigInteger("{$name}_id");
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
-    }
-
-    /**
-     * Add nullable columns for a polymorphic table using numeric IDs (incremental).
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function nullableNumericMorphs($name, $indexName = null)
-    {
         $this->string("{$name}_type")->nullable();
 
-        $this->unsignedBigInteger("{$name}_id")->nullable();
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
-    }
-
-    /**
-     * Add the proper columns for a polymorphic table using UUIDs.
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function uuidMorphs($name, $indexName = null)
-    {
-        $this->string("{$name}_type");
-
-        $this->uuid("{$name}_id");
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
-    }
-
-    /**
-     * Add nullable columns for a polymorphic table using UUIDs.
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function nullableUuidMorphs($name, $indexName = null)
-    {
-        $this->string("{$name}_type")->nullable();
-
-        $this->uuid("{$name}_id")->nullable();
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
-    }
-
-    /**
-     * Add the proper columns for a polymorphic table using ULIDs.
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function ulidMorphs($name, $indexName = null)
-    {
-        $this->string("{$name}_type");
-
-        $this->ulid("{$name}_id");
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
-    }
-
-    /**
-     * Add nullable columns for a polymorphic table using ULIDs.
-     *
-     * @param  string  $name
-     * @param  string|null  $indexName
-     * @return void
-     */
-    public function nullableUlidMorphs($name, $indexName = null)
-    {
-        $this->string("{$name}_type")->nullable();
-
-        $this->ulid("{$name}_id")->nullable();
-
-        $this->index(["{$name}_type", "{$name}_id"], $indexName);
+        $this->index(["{$name}_id", "{$name}_type"], $indexName);
     }
 
     /**
      * Adds the `remember_token` column to the table.
      *
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @return \Illuminate\Support\Fluent
      */
     public function rememberToken()
     {
@@ -1663,23 +958,12 @@ class Blueprint
     }
 
     /**
-     * Add a comment to the table.
-     *
-     * @param  string  $comment
-     * @return \Illuminate\Support\Fluent
-     */
-    public function comment($comment)
-    {
-        return $this->addCommand('tableComment', compact('comment'));
-    }
-
-    /**
      * Add a new index command to the blueprint.
      *
-     * @param  string  $type
+     * @param  string        $type
      * @param  string|array  $columns
-     * @param  string  $index
-     * @param  string|null  $algorithm
+     * @param  string        $index
+     * @param  string|null   $algorithm
      * @return \Illuminate\Support\Fluent
      */
     protected function indexCommand($type, $columns, $index, $algorithm = null)
@@ -1722,12 +1006,12 @@ class Blueprint
      * Create a default index name for the table.
      *
      * @param  string  $type
-     * @param  array  $columns
+     * @param  array   $columns
      * @return string
      */
     protected function createIndexName($type, array $columns)
     {
-        $index = strtolower($this->prefix.$this->table.'_'.implode('_', $columns).'_'.$type);
+        $index = strtolower($this->table.'_'.implode('_', $columns).'_'.$type);
 
         return str_replace(['-', '.'], '_', $index);
     }
@@ -1737,49 +1021,16 @@ class Blueprint
      *
      * @param  string  $type
      * @param  string  $name
-     * @param  array  $parameters
-     * @return \Illuminate\Database\Schema\ColumnDefinition
+     * @param  array   $parameters
+     * @return \Illuminate\Support\Fluent
      */
     public function addColumn($type, $name, array $parameters = [])
     {
-        return $this->addColumnDefinition(new ColumnDefinition(
+        $this->columns[] = $column = new Fluent(
             array_merge(compact('type', 'name'), $parameters)
-        ));
-    }
+        );
 
-    /**
-     * Add a new column definition to the blueprint.
-     *
-     * @param  \Illuminate\Database\Schema\ColumnDefinition  $definition
-     * @return \Illuminate\Database\Schema\ColumnDefinition
-     */
-    protected function addColumnDefinition($definition)
-    {
-        $this->columns[] = $definition;
-
-        if ($this->after) {
-            $definition->after($this->after);
-
-            $this->after = $definition->name;
-        }
-
-        return $definition;
-    }
-
-    /**
-     * Add the columns from the callback after the given column.
-     *
-     * @param  string  $column
-     * @param  \Closure  $callback
-     * @return void
-     */
-    public function after($column, Closure $callback)
-    {
-        $this->after = $column;
-
-        $callback($this);
-
-        $this->after = null;
+        return $column;
     }
 
     /**
@@ -1791,7 +1042,7 @@ class Blueprint
     public function removeColumn($name)
     {
         $this->columns = array_values(array_filter($this->columns, function ($c) use ($name) {
-            return $c['name'] != $name;
+            return $c['attributes']['name'] != $name;
         }));
 
         return $this;
@@ -1815,7 +1066,7 @@ class Blueprint
      * Create a new Fluent command.
      *
      * @param  string  $name
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return \Illuminate\Support\Fluent
      */
     protected function createCommand($name, array $parameters = [])
@@ -1834,19 +1085,9 @@ class Blueprint
     }
 
     /**
-     * Get the table prefix.
-     *
-     * @return string
-     */
-    public function getPrefix()
-    {
-        return $this->prefix;
-    }
-
-    /**
      * Get the columns on the blueprint.
      *
-     * @return \Illuminate\Database\Schema\ColumnDefinition[]
+     * @return array
      */
     public function getColumns()
     {
@@ -1856,7 +1097,7 @@ class Blueprint
     /**
      * Get the commands on the blueprint.
      *
-     * @return \Illuminate\Support\Fluent[]
+     * @return array
      */
     public function getCommands()
     {
@@ -1866,7 +1107,7 @@ class Blueprint
     /**
      * Get the columns on the blueprint that should be added.
      *
-     * @return \Illuminate\Database\Schema\ColumnDefinition[]
+     * @return array
      */
     public function getAddedColumns()
     {
@@ -1878,7 +1119,7 @@ class Blueprint
     /**
      * Get the columns on the blueprint that should be changed.
      *
-     * @return \Illuminate\Database\Schema\ColumnDefinition[]
+     * @return array
      */
     public function getChangedColumns()
     {

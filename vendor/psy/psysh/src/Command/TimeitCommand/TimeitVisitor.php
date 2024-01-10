@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2023 Justin Hileman
+ * (c) 2012-2018 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -21,7 +21,6 @@ use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\NodeVisitorAbstract;
 use Psy\CodeCleaner\NoReturnValue;
-use Psy\Command\TimeitCommand;
 
 /**
  * A node visitor for instrumenting code to be executed by the `timeit` command.
@@ -35,8 +34,6 @@ class TimeitVisitor extends NodeVisitorAbstract
 
     /**
      * {@inheritdoc}
-     *
-     * @return Node[]|null Array of nodes
      */
     public function beforeTraverse(array $nodes)
     {
@@ -45,8 +42,6 @@ class TimeitVisitor extends NodeVisitorAbstract
 
     /**
      * {@inheritdoc}
-     *
-     * @return int|Node|null Replacement node (or special return value)
      */
     public function enterNode(Node $node)
     {
@@ -66,8 +61,6 @@ class TimeitVisitor extends NodeVisitorAbstract
 
     /**
      * {@inheritdoc}
-     *
-     * @return int|Node|Node[]|null Replacement node (or special return value)
      */
     public function leaveNode(Node $node)
     {
@@ -78,8 +71,6 @@ class TimeitVisitor extends NodeVisitorAbstract
 
     /**
      * {@inheritdoc}
-     *
-     * @return Node[]|null Array of nodes
      */
     public function afterTraverse(array $nodes)
     {
@@ -106,11 +97,11 @@ class TimeitVisitor extends NodeVisitorAbstract
     /**
      * Get PhpParser AST nodes for a `markStart` call.
      *
-     * @return \PhpParser\Node\Expr\StaticCall
+     * @return PhpParser\Node\Expr\StaticCall
      */
-    private function getStartCall(): StaticCall
+    private function getStartCall()
     {
-        return new StaticCall(new FullyQualifiedName(TimeitCommand::class), 'markStart');
+        return new StaticCall(new FullyQualifiedName('Psy\Command\TimeitCommand'), 'markStart');
     }
 
     /**
@@ -119,14 +110,16 @@ class TimeitVisitor extends NodeVisitorAbstract
      * Optionally pass in a return value.
      *
      * @param Expr|null $arg
+     *
+     * @return PhpParser\Node\Expr\StaticCall
      */
-    private function getEndCall(Expr $arg = null): StaticCall
+    private function getEndCall(Expr $arg = null)
     {
         if ($arg === null) {
             $arg = NoReturnValue::create();
         }
 
-        return new StaticCall(new FullyQualifiedName(TimeitCommand::class), 'markEnd', [new Arg($arg)]);
+        return new StaticCall(new FullyQualifiedName('Psy\Command\TimeitCommand'), 'markEnd', [new Arg($arg)]);
     }
 
     /**
@@ -134,13 +127,13 @@ class TimeitVisitor extends NodeVisitorAbstract
      *
      * Wrap $expr in a PhpParser\Node\Stmt\Expression if the class exists.
      *
-     * @param \PhpParser\Node $expr
-     * @param array           $attrs
+     * @param PhpParser\Node $expr
+     * @param array          $attrs
      *
-     * @return \PhpParser\Node\Expr|\PhpParser\Node\Stmt\Expression
+     * @return PhpParser\Node\Expr|PhpParser\Node\Stmt\Expression
      */
-    private function maybeExpression(Node $expr, array $attrs = [])
+    private function maybeExpression($expr, $attrs = [])
     {
-        return \class_exists(Expression::class) ? new Expression($expr, $attrs) : $expr;
+        return \class_exists('PhpParser\Node\Stmt\Expression') ? new Expression($expr, $attrs) : $expr;
     }
 }

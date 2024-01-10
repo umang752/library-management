@@ -3,24 +3,18 @@
 namespace Illuminate\Foundation\Http\Middleware;
 
 use Closure;
-use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Contracts\Encryption\Encrypter;
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\Support\Responsable;
-use Illuminate\Cookie\CookieValuePrefix;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Session\TokenMismatchException;
-use Illuminate\Support\InteractsWithTime;
+use Carbon\Carbon;
+use Illuminate\Foundation\Application;
 use Symfony\Component\HttpFoundation\Cookie;
+use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Session\TokenMismatchException;
 
 class VerifyCsrfToken
 {
-    use InteractsWithTime;
-
     /**
      * The application instance.
      *
-     * @var \Illuminate\Contracts\Foundation\Application
+     * @var \Illuminate\Foundation\Application
      */
     protected $app;
 
@@ -34,21 +28,14 @@ class VerifyCsrfToken
     /**
      * The URIs that should be excluded from CSRF verification.
      *
-     * @var array<int, string>
+     * @var array
      */
     protected $except = [];
 
     /**
-     * Indicates whether the XSRF-TOKEN cookie should be set on the response.
-     *
-     * @var bool
-     */
-    protected $addHttpCookie = true;
-
-    /**
      * Create a new middleware instance.
      *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Encryption\Encrypter  $encrypter
      * @return void
      */
@@ -75,14 +62,10 @@ class VerifyCsrfToken
             $this->inExceptArray($request) ||
             $this->tokensMatch($request)
         ) {
-            return tap($next($request), function ($response) use ($request) {
-                if ($this->shouldAddXsrfTokenCookie()) {
-                    $this->addCookieToResponse($request, $response);
-                }
-            });
+            return $this->addCookieToResponse($request, $next($request));
         }
 
-        throw new TokenMismatchException('CSRF token mismatch.');
+        throw new TokenMismatchException;
     }
 
     /**
@@ -119,7 +102,7 @@ class VerifyCsrfToken
                 $except = trim($except, '/');
             }
 
-            if ($request->fullUrlIs($except) || $request->is($except)) {
+            if ($request->is($except)) {
                 return true;
             }
         }
@@ -146,31 +129,17 @@ class VerifyCsrfToken
      * Get the CSRF token from the request.
      *
      * @param  \Illuminate\Http\Request  $request
-     * @return string|null
+     * @return string
      */
     protected function getTokenFromRequest($request)
     {
         $token = $request->input('_token') ?: $request->header('X-CSRF-TOKEN');
 
         if (! $token && $header = $request->header('X-XSRF-TOKEN')) {
-            try {
-                $token = CookieValuePrefix::remove($this->encrypter->decrypt($header, static::serialized()));
-            } catch (DecryptException) {
-                $token = '';
-            }
+            $token = $this->encrypter->decrypt($header);
         }
 
         return $token;
-    }
-
-    /**
-     * Determine if the cookie should be added to the response.
-     *
-     * @return bool
-     */
-    public function shouldAddXsrfTokenCookie()
-    {
-        return $this->addHttpCookie;
     }
 
     /**
@@ -184,45 +153,13 @@ class VerifyCsrfToken
     {
         $config = config('session');
 
-        if ($response instanceof Responsable) {
-            $response = $response->toResponse($request);
-        }
-
-        $response->headers->setCookie($this->newCookie($request, $config));
+        $response->headers->setCookie(
+            new Cookie(
+                'XSRF-TOKEN', $request->session()->token(), Carbon::now()->getTimestamp() + 60 * $config['lifetime'],
+                $config['path'], $config['domain'], $config['secure'], false
+            )
+        );
 
         return $response;
-    }
-
-    /**
-     * Create a new "XSRF-TOKEN" cookie that contains the CSRF token.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  array  $config
-     * @return \Symfony\Component\HttpFoundation\Cookie
-     */
-    protected function newCookie($request, $config)
-    {
-        return new Cookie(
-            'XSRF-TOKEN',
-            $request->session()->token(),
-            $this->availableAt(60 * $config['lifetime']),
-            $config['path'],
-            $config['domain'],
-            $config['secure'],
-            false,
-            false,
-            $config['same_site'] ?? null,
-            $config['partitioned'] ?? false
-        );
-    }
-
-    /**
-     * Determine if the cookie contents should be serialized.
-     *
-     * @return bool
-     */
-    public static function serialized()
-    {
-        return EncryptCookies::serialized('XSRF-TOKEN');
     }
 }

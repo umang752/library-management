@@ -2,30 +2,21 @@
 
 namespace Illuminate\Database;
 
-use Doctrine\DBAL\Types\Type;
-use Illuminate\Database\Connectors\ConnectionFactory;
-use Illuminate\Database\Events\ConnectionEstablished;
-use Illuminate\Support\Arr;
-use Illuminate\Support\ConfigurationUrlParser;
-use Illuminate\Support\Str;
-use Illuminate\Support\Traits\Macroable;
-use InvalidArgumentException;
 use PDO;
-use RuntimeException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+use Illuminate\Database\Connectors\ConnectionFactory;
 
 /**
  * @mixin \Illuminate\Database\Connection
  */
 class DatabaseManager implements ConnectionResolverInterface
 {
-    use Macroable {
-        __call as macroCall;
-    }
-
     /**
      * The application instance.
      *
-     * @var \Illuminate\Contracts\Foundation\Application
+     * @var \Illuminate\Foundation\Application
      */
     protected $app;
 
@@ -39,35 +30,21 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * The active connection instances.
      *
-     * @var array<string, \Illuminate\Database\Connection>
+     * @var array
      */
     protected $connections = [];
 
     /**
      * The custom connection resolvers.
      *
-     * @var array<string, callable>
+     * @var array
      */
     protected $extensions = [];
 
     /**
-     * The callback to be executed to reconnect to a database.
-     *
-     * @var callable
-     */
-    protected $reconnector;
-
-    /**
-     * The custom Doctrine column types.
-     *
-     * @var array<string, array>
-     */
-    protected $doctrineTypes = [];
-
-    /**
      * Create a new database manager instance.
      *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * @param  \Illuminate\Foundation\Application  $app
      * @param  \Illuminate\Database\Connectors\ConnectionFactory  $factory
      * @return void
      */
@@ -75,21 +52,17 @@ class DatabaseManager implements ConnectionResolverInterface
     {
         $this->app = $app;
         $this->factory = $factory;
-
-        $this->reconnector = function ($connection) {
-            $this->reconnect($connection->getNameWithReadWriteType());
-        };
     }
 
     /**
      * Get a database connection instance.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return \Illuminate\Database\Connection
      */
     public function connection($name = null)
     {
-        [$database, $type] = $this->parseConnectionName($name);
+        list($database, $type) = $this->parseConnectionName($name);
 
         $name = $name ?: $database;
 
@@ -98,14 +71,8 @@ class DatabaseManager implements ConnectionResolverInterface
         // set the "fetch mode" for PDO which determines the query return types.
         if (! isset($this->connections[$name])) {
             $this->connections[$name] = $this->configure(
-                $this->makeConnection($database), $type
+                $connection = $this->makeConnection($database), $type
             );
-
-            if ($this->app->bound('events')) {
-                $this->app['events']->dispatch(
-                    new ConnectionEstablished($this->connections[$name])
-                );
-            }
         }
 
         return $this->connections[$name];
@@ -170,11 +137,10 @@ class DatabaseManager implements ConnectionResolverInterface
         $connections = $this->app['config']['database.connections'];
 
         if (is_null($config = Arr::get($connections, $name))) {
-            throw new InvalidArgumentException("Database connection [{$name}] not configured.");
+            throw new InvalidArgumentException("Database [$name] not configured.");
         }
 
-        return (new ConfigurationUrlParser)
-                    ->parseConfiguration($config);
+        return $config;
     }
 
     /**
@@ -186,7 +152,7 @@ class DatabaseManager implements ConnectionResolverInterface
      */
     protected function configure(Connection $connection, $type)
     {
-        $connection = $this->setPdoForType($connection, $type)->setReadWriteType($type);
+        $connection = $this->setPdoForType($connection, $type);
 
         // First we'll set the fetch mode and a few other dependencies of the database
         // connection. This method basically just configures and prepares it to get
@@ -195,16 +161,12 @@ class DatabaseManager implements ConnectionResolverInterface
             $connection->setEventDispatcher($this->app['events']);
         }
 
-        if ($this->app->bound('db.transactions')) {
-            $connection->setTransactionManager($this->app['db.transactions']);
-        }
-
         // Here we'll set a reconnector callback. This reconnector can be any callable
         // so we will set a Closure to reconnect from this manager with the name of
         // the connection, which will allow us to reconnect from the connections.
-        $connection->setReconnector($this->reconnector);
-
-        $this->registerConfiguredDoctrineTypes($connection);
+        $connection->setReconnector(function ($connection) {
+            $this->reconnect($connection->getName());
+        });
 
         return $connection;
     }
@@ -213,14 +175,14 @@ class DatabaseManager implements ConnectionResolverInterface
      * Prepare the read / write mode for database connection instance.
      *
      * @param  \Illuminate\Database\Connection  $connection
-     * @param  string|null  $type
+     * @param  string  $type
      * @return \Illuminate\Database\Connection
      */
     protected function setPdoForType(Connection $connection, $type = null)
     {
-        if ($type === 'read') {
+        if ($type == 'read') {
             $connection->setPdo($connection->getReadPdo());
-        } elseif ($type === 'write') {
+        } elseif ($type == 'write') {
             $connection->setReadPdo($connection->getPdo());
         }
 
@@ -228,52 +190,9 @@ class DatabaseManager implements ConnectionResolverInterface
     }
 
     /**
-     * Register custom Doctrine types with the connection.
-     *
-     * @param  \Illuminate\Database\Connection  $connection
-     * @return void
-     */
-    protected function registerConfiguredDoctrineTypes(Connection $connection): void
-    {
-        foreach ($this->app['config']->get('database.dbal.types', []) as $name => $class) {
-            $this->registerDoctrineType($class, $name, $name);
-        }
-
-        foreach ($this->doctrineTypes as $name => [$type, $class]) {
-            $connection->registerDoctrineType($class, $name, $type);
-        }
-    }
-
-    /**
-     * Register a custom Doctrine type.
-     *
-     * @param  string  $class
-     * @param  string  $name
-     * @param  string  $type
-     * @return void
-     *
-     * @throws \Doctrine\DBAL\Exception
-     * @throws \RuntimeException
-     */
-    public function registerDoctrineType(string $class, string $name, string $type): void
-    {
-        if (! class_exists('Doctrine\DBAL\Connection')) {
-            throw new RuntimeException(
-                'Registering a custom Doctrine type requires Doctrine DBAL (doctrine/dbal).'
-            );
-        }
-
-        if (! Type::hasType($name)) {
-            Type::addType($name, $class);
-        }
-
-        $this->doctrineTypes[$name] = [$type, $class];
-    }
-
-    /**
      * Disconnect from the given database and remove from local cache.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return void
      */
     public function purge($name = null)
@@ -288,7 +207,7 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Disconnect from the given database.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return void
      */
     public function disconnect($name = null)
@@ -301,7 +220,7 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Reconnect to the given database.
      *
-     * @param  string|null  $name
+     * @param  string  $name
      * @return \Illuminate\Database\Connection
      */
     public function reconnect($name = null)
@@ -316,24 +235,6 @@ class DatabaseManager implements ConnectionResolverInterface
     }
 
     /**
-     * Set the default database connection for the callback execution.
-     *
-     * @param  string  $name
-     * @param  callable  $callback
-     * @return mixed
-     */
-    public function usingConnection($name, callable $callback)
-    {
-        $previousName = $this->getDefaultConnection();
-
-        $this->setDefaultConnection($name);
-
-        return tap($callback(), function () use ($previousName) {
-            $this->setDefaultConnection($previousName);
-        });
-    }
-
-    /**
      * Refresh the PDO connections on a given connection.
      *
      * @param  string  $name
@@ -341,15 +242,11 @@ class DatabaseManager implements ConnectionResolverInterface
      */
     protected function refreshPdoConnections($name)
     {
-        [$database, $type] = $this->parseConnectionName($name);
-
-        $fresh = $this->configure(
-            $this->makeConnection($database), $type
-        );
+        $fresh = $this->makeConnection($name);
 
         return $this->connections[$name]
-                    ->setPdo($fresh->getRawPdo())
-                    ->setReadPdo($fresh->getRawReadPdo());
+                                ->setPdo($fresh->getPdo())
+                                ->setReadPdo($fresh->getReadPdo());
     }
 
     /**
@@ -376,7 +273,7 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Get all of the support drivers.
      *
-     * @return string[]
+     * @return array
      */
     public function supportedDrivers()
     {
@@ -386,7 +283,7 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Get all of the drivers that are actually available.
      *
-     * @return string[]
+     * @return array
      */
     public function availableDrivers()
     {
@@ -399,7 +296,7 @@ class DatabaseManager implements ConnectionResolverInterface
     /**
      * Register an extension connection resolver.
      *
-     * @param  string  $name
+     * @param  string    $name
      * @param  callable  $resolver
      * @return void
      */
@@ -409,20 +306,9 @@ class DatabaseManager implements ConnectionResolverInterface
     }
 
     /**
-     * Remove an extension connection resolver.
-     *
-     * @param  string  $name
-     * @return void
-     */
-    public function forgetExtension($name)
-    {
-        unset($this->extensions[$name]);
-    }
-
-    /**
      * Return all of the created connections.
      *
-     * @return array<string, \Illuminate\Database\Connection>
+     * @return array
      */
     public function getConnections()
     {
@@ -430,42 +316,14 @@ class DatabaseManager implements ConnectionResolverInterface
     }
 
     /**
-     * Set the database reconnector callback.
-     *
-     * @param  callable  $reconnector
-     * @return void
-     */
-    public function setReconnector(callable $reconnector)
-    {
-        $this->reconnector = $reconnector;
-    }
-
-    /**
-     * Set the application instance used by the manager.
-     *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @return $this
-     */
-    public function setApplication($app)
-    {
-        $this->app = $app;
-
-        return $this;
-    }
-
-    /**
      * Dynamically pass methods to the default connection.
      *
      * @param  string  $method
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return mixed
      */
     public function __call($method, $parameters)
     {
-        if (static::hasMacro($method)) {
-            return $this->macroCall($method, $parameters);
-        }
-
         return $this->connection()->$method(...$parameters);
     }
 }

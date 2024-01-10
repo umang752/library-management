@@ -3,14 +3,11 @@
 namespace Illuminate\Config;
 
 use ArrayAccess;
-use Illuminate\Contracts\Config\Repository as ConfigContract;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Traits\Macroable;
+use Illuminate\Contracts\Config\Repository as ConfigContract;
 
 class Repository implements ArrayAccess, ConfigContract
 {
-    use Macroable;
-
     /**
      * All of the configuration items.
      *
@@ -43,45 +40,20 @@ class Repository implements ArrayAccess, ConfigContract
     /**
      * Get the specified configuration value.
      *
-     * @param  array|string  $key
-     * @param  mixed  $default
+     * @param  string  $key
+     * @param  mixed   $default
      * @return mixed
      */
     public function get($key, $default = null)
     {
-        if (is_array($key)) {
-            return $this->getMany($key);
-        }
-
         return Arr::get($this->items, $key, $default);
-    }
-
-    /**
-     * Get many configuration values.
-     *
-     * @param  array  $keys
-     * @return array
-     */
-    public function getMany($keys)
-    {
-        $config = [];
-
-        foreach ($keys as $key => $default) {
-            if (is_numeric($key)) {
-                [$key, $default] = [$default, null];
-            }
-
-            $config[$key] = Arr::get($this->items, $key, $default);
-        }
-
-        return $config;
     }
 
     /**
      * Set a given configuration value.
      *
      * @param  array|string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return void
      */
     public function set($key, $value = null)
@@ -102,7 +74,7 @@ class Repository implements ArrayAccess, ConfigContract
      */
     public function prepend($key, $value)
     {
-        $array = $this->get($key, []);
+        $array = $this->get($key);
 
         array_unshift($array, $value);
 
@@ -118,7 +90,7 @@ class Repository implements ArrayAccess, ConfigContract
      */
     public function push($key, $value)
     {
-        $array = $this->get($key, []);
+        $array = $this->get($key);
 
         $array[] = $value;
 
@@ -141,7 +113,7 @@ class Repository implements ArrayAccess, ConfigContract
      * @param  string  $key
      * @return bool
      */
-    public function offsetExists($key): bool
+    public function offsetExists($key)
     {
         return $this->has($key);
     }
@@ -152,7 +124,7 @@ class Repository implements ArrayAccess, ConfigContract
      * @param  string  $key
      * @return mixed
      */
-    public function offsetGet($key): mixed
+    public function offsetGet($key)
     {
         return $this->get($key);
     }
@@ -164,7 +136,7 @@ class Repository implements ArrayAccess, ConfigContract
      * @param  mixed  $value
      * @return void
      */
-    public function offsetSet($key, $value): void
+    public function offsetSet($key, $value)
     {
         $this->set($key, $value);
     }
@@ -175,7 +147,7 @@ class Repository implements ArrayAccess, ConfigContract
      * @param  string  $key
      * @return void
      */
-    public function offsetUnset($key): void
+    public function offsetUnset($key)
     {
         $this->set($key, null);
     }

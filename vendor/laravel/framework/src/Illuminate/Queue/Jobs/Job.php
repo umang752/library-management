@@ -2,14 +2,7 @@
 
 namespace Illuminate\Queue\Jobs;
 
-use Illuminate\Bus\Batchable;
-use Illuminate\Bus\BatchRepository;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Queue\Events\JobFailed;
-use Illuminate\Queue\ManuallyFailedException;
-use Illuminate\Queue\TimeoutExceededException;
-use Illuminate\Support\InteractsWithTime;
-use Throwable;
+use Illuminate\Queue\InteractsWithTime;
 
 abstract class Job
 {
@@ -52,8 +45,6 @@ abstract class Job
 
     /**
      * The name of the connection the job belongs to.
-     *
-     * @var string
      */
     protected $connectionName;
 
@@ -65,30 +56,6 @@ abstract class Job
     protected $queue;
 
     /**
-     * Get the job identifier.
-     *
-     * @return string
-     */
-    abstract public function getJobId();
-
-    /**
-     * Get the raw body of the job.
-     *
-     * @return string
-     */
-    abstract public function getRawBody();
-
-    /**
-     * Get the UUID of the job.
-     *
-     * @return string|null
-     */
-    public function uuid()
-    {
-        return $this->payload()['uuid'] ?? null;
-    }
-
-    /**
      * Fire the job.
      *
      * @return void
@@ -97,9 +64,9 @@ abstract class Job
     {
         $payload = $this->payload();
 
-        [$class, $method] = JobName::parse($payload['job']);
+        list($class, $method) = JobName::parse($payload['job']);
 
-        ($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
+        with($this->instance = $this->resolve($class))->{$method}($this, $payload['data']);
     }
 
     /**
@@ -123,9 +90,9 @@ abstract class Job
     }
 
     /**
-     * Release the job back into the queue after (n) seconds.
+     * Release the job back into the queue.
      *
-     * @param  int  $delay
+     * @param  int   $delay
      * @return void
      */
     public function release($delay = 0)
@@ -174,66 +141,21 @@ abstract class Job
     }
 
     /**
-     * Delete the job, call the "failed" method, and raise the failed job event.
+     * Process an exception that caused the job to fail.
      *
-     * @param  \Throwable|null  $e
+     * @param  \Exception  $e
      * @return void
      */
-    public function fail($e = null)
+    public function failed($e)
     {
         $this->markAsFailed();
 
-        if ($this->isDeleted()) {
-            return;
-        }
-
-        $commandName = $this->payload()['data']['commandName'] ?? false;
-
-        // If the exception is due to a job timing out, we need to rollback the current
-        // database transaction so that the failed job count can be incremented with
-        // the proper value. Otherwise, the current transaction will never commit.
-        if ($e instanceof TimeoutExceededException &&
-            $commandName &&
-            in_array(Batchable::class, class_uses_recursive($commandName))) {
-            $batchRepository = $this->resolve(BatchRepository::class);
-
-            if (method_exists($batchRepository, 'rollBack')) {
-                try {
-                    $batchRepository->rollBack();
-                } catch (Throwable $e) {
-                    // ...
-                }
-            }
-        }
-
-        try {
-            // If the job has failed, we will delete it, call the "failed" method and then call
-            // an event indicating the job has failed so it can be logged if needed. This is
-            // to allow every developer to better keep monitor of their failed queue jobs.
-            $this->delete();
-
-            $this->failed($e);
-        } finally {
-            $this->resolve(Dispatcher::class)->dispatch(new JobFailed(
-                $this->connectionName, $this, $e ?: new ManuallyFailedException
-            ));
-        }
-    }
-
-    /**
-     * Process an exception that caused the job to fail.
-     *
-     * @param  \Throwable|null  $e
-     * @return void
-     */
-    protected function failed($e)
-    {
         $payload = $this->payload();
 
-        [$class, $method] = JobName::parse($payload['job']);
+        list($class, $method) = JobName::parse($payload['job']);
 
         if (method_exists($this->instance = $this->resolve($class), 'failed')) {
-            $this->instance->failed($payload['data'], $e, $payload['uuid'] ?? '');
+            $this->instance->failed($payload['data'], $e);
         }
     }
 
@@ -249,16 +171,6 @@ abstract class Job
     }
 
     /**
-     * Get the resolved job handler instance.
-     *
-     * @return mixed
-     */
-    public function getResolvedJob()
-    {
-        return $this->instance;
-    }
-
-    /**
      * Get the decoded body of the job.
      *
      * @return array
@@ -269,63 +181,23 @@ abstract class Job
     }
 
     /**
-     * Get the number of times to attempt a job.
+     * The number of times to attempt a job.
      *
      * @return int|null
      */
     public function maxTries()
     {
-        return $this->payload()['maxTries'] ?? null;
+        return array_get($this->payload(), 'maxTries');
     }
 
     /**
-     * Get the number of times to attempt a job after an exception.
-     *
-     * @return int|null
-     */
-    public function maxExceptions()
-    {
-        return $this->payload()['maxExceptions'] ?? null;
-    }
-
-    /**
-     * Determine if the job should fail when it timeouts.
-     *
-     * @return bool
-     */
-    public function shouldFailOnTimeout()
-    {
-        return $this->payload()['failOnTimeout'] ?? false;
-    }
-
-    /**
-     * The number of seconds to wait before retrying a job that encountered an uncaught exception.
-     *
-     * @return int|int[]|null
-     */
-    public function backoff()
-    {
-        return $this->payload()['backoff'] ?? $this->payload()['delay'] ?? null;
-    }
-
-    /**
-     * Get the number of seconds the job can run.
+     * The number of seconds the job can run.
      *
      * @return int|null
      */
     public function timeout()
     {
-        return $this->payload()['timeout'] ?? null;
-    }
-
-    /**
-     * Get the timestamp indicating when the job should timeout.
-     *
-     * @return int|null
-     */
-    public function retryUntil()
-    {
-        return $this->payload()['retryUntil'] ?? null;
+        return array_get($this->payload(), 'timeout');
     }
 
     /**

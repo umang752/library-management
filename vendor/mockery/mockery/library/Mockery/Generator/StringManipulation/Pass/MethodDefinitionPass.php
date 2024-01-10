@@ -1,17 +1,8 @@
 <?php
 
-/**
- * Mockery (https://docs.mockery.io/)
- *
- * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @link      https://github.com/mockery/mockery for the canonical source repository
- */
-
 namespace Mockery\Generator\StringManipulation\Pass;
 
 use Mockery\Generator\Method;
-use Mockery\Generator\Parameter;
 use Mockery\Generator\MockConfiguration;
 
 class MethodDefinitionPass implements Pass
@@ -57,39 +48,15 @@ class MethodDefinitionPass implements Pass
 
         $methodParams = array();
         $params = $method->getParameters();
-        $isPhp81 = \PHP_VERSION_ID >= 80100;
         foreach ($params as $param) {
-            $paramDef = $this->renderTypeHint($param);
+            $paramDef = $param->getTypeHintAsString();
             $paramDef .= $param->isPassedByReference() ? '&' : '';
             $paramDef .= $param->isVariadic() ? '...' : '';
             $paramDef .= '$' . $param->getName();
 
             if (!$param->isVariadic()) {
                 if (false !== $param->isDefaultValueAvailable()) {
-                    $defaultValue = $param->getDefaultValue();
-
-                    if (is_object($defaultValue)) {
-                        $prefix = get_class($defaultValue);
-                        if ($isPhp81) {
-                            if (enum_exists($prefix)) {
-                                $prefix = var_export($defaultValue, true);
-                            } elseif (
-                                !$param->isDefaultValueConstant() &&
-                                // "Parameter #1 [ <optional> F\Q\CN $a = new \F\Q\CN(param1, param2: 2) ]
-                                preg_match(
-                                    '#<optional>\s.*?\s=\snew\s(.*?)\s]$#',
-                                    $param->__toString(),
-                                    $matches
-                                ) === 1
-                            ) {
-                                $prefix = 'new ' . $matches[1];
-                            }
-                        }
-                    } else {
-                        $prefix = var_export($defaultValue, true);
-                    }
-
-                    $paramDef .= ' = ' . $prefix;
+                    $paramDef .= ' = ' . var_export($param->getDefaultValue(), true);
                 } elseif ($param->isOptional()) {
                     $paramDef .= ' = null';
                 }
@@ -103,7 +70,6 @@ class MethodDefinitionPass implements Pass
     protected function renderReturnType(Method $method)
     {
         $type = $method->getReturnType();
-
         return $type ? sprintf(': %s', $type) : '';
     }
 
@@ -114,15 +80,9 @@ class MethodDefinitionPass implements Pass
         return $class;
     }
 
-    protected function renderTypeHint(Parameter $param)
-    {
-        $typeHint = $param->getTypeHint();
-
-        return $typeHint === null ? '' : sprintf('%s ', $typeHint);
-    }
-
     private function renderMethodBody($method, $config)
     {
+        /** @var \ReflectionMethod $method */
         $invoke = $method->isStatic() ? 'static::_mockery_handleStaticMethodCall' : '$this->_mockery_handleMethodCall';
         $body = <<<BODY
 {
@@ -143,6 +103,9 @@ BODY;
             for ($i = 0; $i < $paramCount; ++$i) {
                 $param = $params[$i];
                 if (strpos($param, '&') !== false) {
+                    if (($stripDefaultValue = strpos($param, '=')) !== false) {
+                        $param = trim(substr($param, 0, $stripDefaultValue));
+                    }
                     $body .= <<<BODY
 if (\$argc > $i) {
     \$argv[$i] = {$param};
@@ -152,6 +115,7 @@ BODY;
                 }
             }
         } else {
+            /** @var \ReflectionParameter[] $params */
             $params = array_values($method->getParameters());
             $paramCount = count($params);
             for ($i = 0; $i < $paramCount; ++$i) {
@@ -168,13 +132,24 @@ BODY;
             }
         }
 
-        $body .= "\$ret = {$invoke}(__FUNCTION__, \$argv);\n";
+        $body .= $this->getReturnStatement($method, $invoke);
 
-        if (! in_array($method->getReturnType(), ['never', 'void'], true)) {
-            $body .= "return \$ret;\n";
+        return $body;
+    }
+
+    private function getReturnStatement($method, $invoke)
+    {
+        if ($method->getReturnType() === 'void') {
+            return <<<BODY
+{$invoke}(__FUNCTION__, \$argv);
+}
+BODY;
         }
 
-        $body .= "}\n";
-        return $body;
+        return <<<BODY
+\$ret = {$invoke}(__FUNCTION__, \$argv);
+return \$ret;
+}
+BODY;
     }
 }

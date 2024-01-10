@@ -25,18 +25,28 @@ use Symfony\Component\HttpKernel\Fragment\FragmentRendererInterface;
  */
 class FragmentRendererPass implements CompilerPassInterface
 {
+    private $handlerService;
+    private $rendererTag;
+
     /**
-     * @return void
+     * @param string $handlerService Service name of the fragment handler in the container
+     * @param string $rendererTag    Tag name used for fragments
      */
+    public function __construct($handlerService = 'fragment.handler', $rendererTag = 'kernel.fragment_renderer')
+    {
+        $this->handlerService = $handlerService;
+        $this->rendererTag = $rendererTag;
+    }
+
     public function process(ContainerBuilder $container)
     {
-        if (!$container->hasDefinition('fragment.handler')) {
+        if (!$container->hasDefinition($this->handlerService)) {
             return;
         }
 
-        $definition = $container->getDefinition('fragment.handler');
+        $definition = $container->getDefinition($this->handlerService);
         $renderers = [];
-        foreach ($container->findTaggedServiceIds('kernel.fragment_renderer', true) as $id => $tags) {
+        foreach ($container->findTaggedServiceIds($this->rendererTag, true) as $id => $tags) {
             $def = $container->getDefinition($id);
             $class = $container->getParameterBag()->resolveValue($def->getClass());
 

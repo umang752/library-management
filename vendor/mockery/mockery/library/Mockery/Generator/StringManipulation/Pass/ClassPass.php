@@ -1,13 +1,5 @@
 <?php
 
-/**
- * Mockery (https://docs.mockery.io/)
- *
- * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @link      https://github.com/mockery/mockery for the canonical source repository
- */
-
 namespace Mockery\Generator\StringManipulation\Pass;
 
 use Mockery\Generator\MockConfiguration;
@@ -27,9 +19,24 @@ class ClassPass implements Pass
         }
 
         $className = ltrim($target->getName(), "\\");
-
         if (!class_exists($className)) {
-            \Mockery::declareClass($className);
+            $targetCode = '<?php ';
+
+            if ($target->inNamespace()) {
+                $targetCode.= 'namespace ' . $target->getNamespaceName(). '; ';
+            }
+
+            $targetCode.= 'class ' . $target->getShortName() . ' {} ';
+
+            /*
+             * We could eval here, but it doesn't play well with the way
+             * PHPUnit tries to backup global state and the require definition
+             * loader
+             */
+            $tmpfname = tempnam(sys_get_temp_dir(), "Mockery");
+            file_put_contents($tmpfname, $targetCode);
+            require $tmpfname;
+            \Mockery::registerFileForCleanUp($tmpfname);
         }
 
         $code = str_replace(

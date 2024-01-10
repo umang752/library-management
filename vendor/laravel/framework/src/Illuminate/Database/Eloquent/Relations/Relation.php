@@ -3,20 +3,20 @@
 namespace Illuminate\Database\Eloquent\Relations;
 
 use Closure;
-use Illuminate\Contracts\Database\Eloquent\Builder as BuilderContract;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Database\MultipleRecordsFoundException;
-use Illuminate\Database\Query\Expression;
-use Illuminate\Support\Traits\ForwardsCalls;
 use Illuminate\Support\Traits\Macroable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Expression;
+use Illuminate\Database\Eloquent\Collection;
 
-abstract class Relation implements BuilderContract
+/**
+ * @mixin \Illuminate\Database\Eloquent\Builder
+ */
+abstract class Relation
 {
-    use ForwardsCalls, Macroable {
-        Macroable::__call as macroCall;
+    use Macroable {
+        __call as macroCall;
     }
 
     /**
@@ -41,13 +41,6 @@ abstract class Relation implements BuilderContract
     protected $related;
 
     /**
-     * Indicates whether the eagerly loaded relation should implicitly return an empty collection.
-     *
-     * @var bool
-     */
-    protected $eagerKeysWereEmpty = false;
-
-    /**
      * Indicates if the relation is adding constraints.
      *
      * @var bool
@@ -55,25 +48,11 @@ abstract class Relation implements BuilderContract
     protected static $constraints = true;
 
     /**
-     * An array to map class names to their morph names in the database.
+     * An array to map class names to their morph names in database.
      *
      * @var array
      */
-    public static $morphMap = [];
-
-    /**
-     * Prevents morph relationships without a morph map.
-     *
-     * @var bool
-     */
-    protected static $requireMorphMap = false;
-
-    /**
-     * The count of self joins.
-     *
-     * @var int
-     */
-    protected static $selfJoinCount = 0;
+    protected static $morphMap = [];
 
     /**
      * Create a new relation instance.
@@ -107,7 +86,7 @@ abstract class Relation implements BuilderContract
         // off of the bindings, leaving only the constraints that the developers put
         // as "extra" on the relationships, and not original relation constraints.
         try {
-            return $callback();
+            return call_user_func($callback);
         } finally {
             static::$constraints = $previous;
         }
@@ -131,7 +110,7 @@ abstract class Relation implements BuilderContract
     /**
      * Initialize the relation on a set of models.
      *
-     * @param  array  $models
+     * @param  array   $models
      * @param  string  $relation
      * @return array
      */
@@ -140,7 +119,7 @@ abstract class Relation implements BuilderContract
     /**
      * Match the eagerly loaded results to their parents.
      *
-     * @param  array  $models
+     * @param  array   $models
      * @param  \Illuminate\Database\Eloquent\Collection  $results
      * @param  string  $relation
      * @return array
@@ -161,46 +140,7 @@ abstract class Relation implements BuilderContract
      */
     public function getEager()
     {
-        return $this->eagerKeysWereEmpty
-                    ? $this->query->getModel()->newCollection()
-                    : $this->get();
-    }
-
-    /**
-     * Execute the query and get the first result if it's the sole matching record.
-     *
-     * @param  array|string  $columns
-     * @return \Illuminate\Database\Eloquent\Model
-     *
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException<\Illuminate\Database\Eloquent\Model>
-     * @throws \Illuminate\Database\MultipleRecordsFoundException
-     */
-    public function sole($columns = ['*'])
-    {
-        $result = $this->take(2)->get($columns);
-
-        $count = $result->count();
-
-        if ($count === 0) {
-            throw (new ModelNotFoundException)->setModel(get_class($this->related));
-        }
-
-        if ($count > 1) {
-            throw new MultipleRecordsFoundException($count);
-        }
-
-        return $result->first();
-    }
-
-    /**
-     * Execute the query as a "select" statement.
-     *
-     * @param  array  $columns
-     * @return \Illuminate\Database\Eloquent\Collection
-     */
-    public function get($columns = ['*'])
-    {
-        return $this->query->get($columns);
+        return $this->get();
     }
 
     /**
@@ -210,13 +150,9 @@ abstract class Relation implements BuilderContract
      */
     public function touch()
     {
-        $model = $this->getRelated();
+        $column = $this->getRelated()->getUpdatedAtColumn();
 
-        if (! $model::isIgnoringTouch()) {
-            $this->rawUpdate([
-                $model->getUpdatedAtColumn() => $model->freshTimestampString(),
-            ]);
-        }
+        $this->rawUpdate([$column => $this->getRelated()->freshTimestampString()]);
     }
 
     /**
@@ -227,7 +163,7 @@ abstract class Relation implements BuilderContract
      */
     public function rawUpdate(array $attributes = [])
     {
-        return $this->query->withoutGlobalScopes()->update($attributes);
+        return $this->query->update($attributes);
     }
 
     /**
@@ -241,7 +177,7 @@ abstract class Relation implements BuilderContract
     {
         return $this->getRelationExistenceQuery(
             $query, $parentQuery, new Expression('count(*)')
-        )->setBindings([], 'select');
+        );
     }
 
     /**
@@ -251,7 +187,7 @@ abstract class Relation implements BuilderContract
      *
      * @param  \Illuminate\Database\Eloquent\Builder  $query
      * @param  \Illuminate\Database\Eloquent\Builder  $parentQuery
-     * @param  array|mixed  $columns
+     * @param  array|mixed $columns
      * @return \Illuminate\Database\Eloquent\Builder
      */
     public function getRelationExistenceQuery(Builder $query, Builder $parentQuery, $columns = ['*'])
@@ -262,38 +198,17 @@ abstract class Relation implements BuilderContract
     }
 
     /**
-     * Get a relationship join table hash.
-     *
-     * @param  bool  $incrementJoinCount
-     * @return string
-     */
-    public function getRelationCountHash($incrementJoinCount = true)
-    {
-        return 'laravel_reserved_'.($incrementJoinCount ? static::$selfJoinCount++ : static::$selfJoinCount);
-    }
-
-    /**
      * Get all of the primary keys for an array of models.
      *
-     * @param  array  $models
-     * @param  string|null  $key
+     * @param  array   $models
+     * @param  string  $key
      * @return array
      */
     protected function getKeys(array $models, $key = null)
     {
         return collect($models)->map(function ($value) use ($key) {
             return $key ? $value->getAttribute($key) : $value->getKey();
-        })->values()->unique(null, true)->sort()->all();
-    }
-
-    /**
-     * Get the query builder that will contain the relationship constraints.
-     *
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    protected function getRelationQuery()
-    {
-        return $this->query;
+        })->values()->unique()->sort()->all();
     }
 
     /**
@@ -314,16 +229,6 @@ abstract class Relation implements BuilderContract
     public function getBaseQuery()
     {
         return $this->query->getQuery();
-    }
-
-    /**
-     * Get a base query builder instance.
-     *
-     * @return \Illuminate\Database\Query\Builder
-     */
-    public function toBase()
-    {
-        return $this->query->toBase();
     }
 
     /**
@@ -387,74 +292,6 @@ abstract class Relation implements BuilderContract
     }
 
     /**
-     * Add a whereIn eager constraint for the given set of model keys to be loaded.
-     *
-     * @param  string  $whereIn
-     * @param  string  $key
-     * @param  array  $modelKeys
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return void
-     */
-    protected function whereInEager(string $whereIn, string $key, array $modelKeys, $query = null)
-    {
-        ($query ?? $this->query)->{$whereIn}($key, $modelKeys);
-
-        if ($modelKeys === []) {
-            $this->eagerKeysWereEmpty = true;
-        }
-    }
-
-    /**
-     * Get the name of the "where in" method for eager loading.
-     *
-     * @param  \Illuminate\Database\Eloquent\Model  $model
-     * @param  string  $key
-     * @return string
-     */
-    protected function whereInMethod(Model $model, $key)
-    {
-        return $model->getKeyName() === last(explode('.', $key))
-                    && in_array($model->getKeyType(), ['int', 'integer'])
-                        ? 'whereIntegerInRaw'
-                        : 'whereIn';
-    }
-
-    /**
-     * Prevent polymorphic relationships from being used without model mappings.
-     *
-     * @param  bool  $requireMorphMap
-     * @return void
-     */
-    public static function requireMorphMap($requireMorphMap = true)
-    {
-        static::$requireMorphMap = $requireMorphMap;
-    }
-
-    /**
-     * Determine if polymorphic relationships require explicit model mapping.
-     *
-     * @return bool
-     */
-    public static function requiresMorphMap()
-    {
-        return static::$requireMorphMap;
-    }
-
-    /**
-     * Define the morph map for polymorphic relations and require all morphed models to be explicitly mapped.
-     *
-     * @param  array  $map
-     * @param  bool  $merge
-     * @return array
-     */
-    public static function enforceMorphMap(array $map, $merge = true)
-    {
-        static::requireMorphMap();
-
-        return static::morphMap($map, $merge);
-    }
-
-    /**
      * Set or get the morph map for polymorphic relations.
      *
      * @param  array|null  $map
@@ -467,7 +304,7 @@ abstract class Relation implements BuilderContract
 
         if (is_array($map)) {
             static::$morphMap = $merge && static::$morphMap
-                            ? $map + static::$morphMap : $map;
+                            ? array_merge(static::$morphMap, $map) : $map;
         }
 
         return static::$morphMap;
@@ -481,7 +318,7 @@ abstract class Relation implements BuilderContract
      */
     protected static function buildMorphMapFromModels(array $models = null)
     {
-        if (is_null($models) || ! array_is_list($models)) {
+        if (is_null($models) || Arr::isAssoc($models)) {
             return $models;
         }
 
@@ -498,14 +335,16 @@ abstract class Relation implements BuilderContract
      */
     public static function getMorphedModel($alias)
     {
-        return static::$morphMap[$alias] ?? null;
+        return array_key_exists($alias, self::$morphMap)
+            ? self::$morphMap[$alias]
+            : null;
     }
 
     /**
      * Handle dynamic method calls to the relationship.
      *
      * @param  string  $method
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return mixed
      */
     public function __call($method, $parameters)
@@ -514,7 +353,13 @@ abstract class Relation implements BuilderContract
             return $this->macroCall($method, $parameters);
         }
 
-        return $this->forwardDecoratedCallTo($this->query, $method, $parameters);
+        $result = call_user_func_array([$this->query, $method], $parameters);
+
+        if ($result === $this->query) {
+            return $this;
+        }
+
+        return $result;
     }
 
     /**

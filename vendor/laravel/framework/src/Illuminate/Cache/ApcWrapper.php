@@ -29,17 +29,15 @@ class ApcWrapper
      */
     public function get($key)
     {
-        $fetchedValue = $this->apcu ? apcu_fetch($key, $success) : apc_fetch($key, $success);
-
-        return $success ? $fetchedValue : null;
+        return $this->apcu ? apcu_fetch($key) : apc_fetch($key);
     }
 
     /**
      * Store an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
+     * @param  mixed   $value
+     * @param  int     $seconds
      * @return array|bool
      */
     public function put($key, $value, $seconds)
@@ -51,7 +49,7 @@ class ApcWrapper
      * Increment the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int|bool
      */
     public function increment($key, $value)
@@ -63,7 +61,7 @@ class ApcWrapper
      * Decrement the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int|bool
      */
     public function decrement($key, $value)

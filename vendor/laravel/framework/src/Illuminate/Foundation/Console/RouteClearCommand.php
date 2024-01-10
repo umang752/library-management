@@ -4,9 +4,7 @@ namespace Illuminate\Foundation\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
-use Symfony\Component\Console\Attribute\AsCommand;
 
-#[AsCommand(name: 'route:clear')]
 class RouteClearCommand extends Command
 {
     /**
@@ -48,10 +46,10 @@ class RouteClearCommand extends Command
      *
      * @return void
      */
-    public function handle()
+    public function fire()
     {
         $this->files->delete($this->laravel->getCachedRoutesPath());
 
-        $this->components->info('Route cache cleared successfully.');
+        $this->info('Route cache cleared!');
     }
 }

@@ -1,4 +1,4 @@
-<?php declare(strict_types=1);
+<?php
 /*
  * This file is part of sebastian/diff.
  *
@@ -7,118 +7,97 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
 namespace SebastianBergmann\Diff;
 
-use ArrayIterator;
-use IteratorAggregate;
-use Traversable;
-
-/**
- * @template-implements IteratorAggregate<int, Line>
- */
-final class Chunk implements IteratorAggregate
+class Chunk
 {
-    private int $start;
-    private int $startRange;
-    private int $end;
-    private int $endRange;
-    private array $lines;
+    /**
+     * @var int
+     */
+    private $start;
 
-    public function __construct(int $start = 0, int $startRange = 1, int $end = 0, int $endRange = 1, array $lines = [])
+    /**
+     * @var int
+     */
+    private $startRange;
+
+    /**
+     * @var int
+     */
+    private $end;
+
+    /**
+     * @var int
+     */
+    private $endRange;
+
+    /**
+     * @var array
+     */
+    private $lines;
+
+    /**
+     * @param int   $start
+     * @param int   $startRange
+     * @param int   $end
+     * @param int   $endRange
+     * @param array $lines
+     */
+    public function __construct($start = 0, $startRange = 1, $end = 0, $endRange = 1, array $lines = array())
     {
-        $this->start      = $start;
-        $this->startRange = $startRange;
-        $this->end        = $end;
-        $this->endRange   = $endRange;
+        $this->start      = (int) $start;
+        $this->startRange = (int) $startRange;
+        $this->end        = (int) $end;
+        $this->endRange   = (int) $endRange;
         $this->lines      = $lines;
     }
 
-    public function start(): int
+    /**
+     * @return int
+     */
+    public function getStart()
     {
         return $this->start;
     }
 
-    public function startRange(): int
+    /**
+     * @return int
+     */
+    public function getStartRange()
     {
         return $this->startRange;
     }
 
-    public function end(): int
+    /**
+     * @return int
+     */
+    public function getEnd()
     {
         return $this->end;
     }
 
-    public function endRange(): int
+    /**
+     * @return int
+     */
+    public function getEndRange()
     {
         return $this->endRange;
     }
 
     /**
-     * @psalm-return list<Line>
+     * @return array
      */
-    public function lines(): array
+    public function getLines()
     {
         return $this->lines;
     }
 
     /**
-     * @psalm-param list<Line> $lines
+     * @param array $lines
      */
-    public function setLines(array $lines): void
+    public function setLines(array $lines)
     {
-        foreach ($lines as $line) {
-            if (!$line instanceof Line) {
-                throw new InvalidArgumentException;
-            }
-        }
-
         $this->lines = $lines;
-    }
-
-    /**
-     * @deprecated Use start() instead
-     */
-    public function getStart(): int
-    {
-        return $this->start;
-    }
-
-    /**
-     * @deprecated Use startRange() instead
-     */
-    public function getStartRange(): int
-    {
-        return $this->startRange;
-    }
-
-    /**
-     * @deprecated Use end() instead
-     */
-    public function getEnd(): int
-    {
-        return $this->end;
-    }
-
-    /**
-     * @deprecated Use endRange() instead
-     */
-    public function getEndRange(): int
-    {
-        return $this->endRange;
-    }
-
-    /**
-     * @psalm-return list<Line>
-     *
-     * @deprecated Use lines() instead
-     */
-    public function getLines(): array
-    {
-        return $this->lines;
-    }
-
-    public function getIterator(): Traversable
-    {
-        return new ArrayIterator($this->lines);
     }
 }

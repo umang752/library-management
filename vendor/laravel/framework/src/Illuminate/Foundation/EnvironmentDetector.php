@@ -3,6 +3,8 @@
 namespace Illuminate\Foundation;
 
 use Closure;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
 class EnvironmentDetector
 {
@@ -30,7 +32,7 @@ class EnvironmentDetector
      */
     protected function detectWebEnvironment(Closure $callback)
     {
-        return $callback();
+        return call_user_func($callback);
     }
 
     /**
@@ -46,7 +48,7 @@ class EnvironmentDetector
         // and if it was that automatically overrides as the environment. Otherwise, we
         // will check the environment as a "web" request like a typical HTTP request.
         if (! is_null($value = $this->getEnvironmentArgument($args))) {
-            return $value;
+            return head(array_slice(explode('=', $value), 1));
         }
 
         return $this->detectWebEnvironment($callback);
@@ -60,14 +62,8 @@ class EnvironmentDetector
      */
     protected function getEnvironmentArgument(array $args)
     {
-        foreach ($args as $i => $value) {
-            if ($value === '--env') {
-                return $args[$i + 1] ?? null;
-            }
-
-            if (str_starts_with($value, '--env')) {
-                return head(array_slice(explode('=', $value), 1));
-            }
-        }
+        return Arr::first($args, function ($value) {
+            return Str::startsWith($value, '--env');
+        });
     }
 }

@@ -13,7 +13,6 @@ namespace Symfony\Component\HttpKernel\DependencyInjection;
 
 use Psr\Container\ContainerInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\Controller\ControllerReference;
 use Symfony\Component\HttpKernel\Fragment\FragmentHandler;
 
 /**
@@ -23,22 +22,53 @@ use Symfony\Component\HttpKernel\Fragment\FragmentHandler;
  */
 class LazyLoadingFragmentHandler extends FragmentHandler
 {
-    private ContainerInterface $container;
+    private $container;
+    /**
+     * @deprecated since version 3.3, to be removed in 4.0
+     */
+    private $rendererIds = [];
+    private $initialized = [];
 
     /**
-     * @var array<string, bool>
+     * @param ContainerInterface $container    A container
+     * @param RequestStack       $requestStack The Request stack that controls the lifecycle of requests
+     * @param bool               $debug        Whether the debug mode is enabled or not
      */
-    private array $initialized = [];
-
-    public function __construct(ContainerInterface $container, RequestStack $requestStack, bool $debug = false)
+    public function __construct(ContainerInterface $container, RequestStack $requestStack, $debug = false)
     {
         $this->container = $container;
 
         parent::__construct($requestStack, [], $debug);
     }
 
-    public function render(string|ControllerReference $uri, string $renderer = 'inline', array $options = []): ?string
+    /**
+     * Adds a service as a fragment renderer.
+     *
+     * @param string $name     The service name
+     * @param string $renderer The render service id
+     *
+     * @deprecated since version 3.3, to be removed in 4.0
+     */
+    public function addRendererService($name, $renderer)
     {
+        @trigger_error(sprintf('The %s() method is deprecated since Symfony 3.3 and will be removed in 4.0.', __METHOD__), \E_USER_DEPRECATED);
+
+        $this->rendererIds[$name] = $renderer;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function render($uri, $renderer = 'inline', array $options = [])
+    {
+        // BC 3.x, to be removed in 4.0
+        if (isset($this->rendererIds[$renderer])) {
+            $this->addRenderer($this->container->get($this->rendererIds[$renderer]));
+            unset($this->rendererIds[$renderer]);
+
+            return parent::render($uri, $renderer, $options);
+        }
+
         if (!isset($this->initialized[$renderer]) && $this->container->has($renderer)) {
             $this->addRenderer($this->container->get($renderer));
             $this->initialized[$renderer] = true;

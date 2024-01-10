@@ -2,7 +2,7 @@
 
 namespace Illuminate\Console;
 
-use function Laravel\Prompts\confirm;
+use Closure;
 
 trait ConfirmableTrait
 {
@@ -15,23 +15,23 @@ trait ConfirmableTrait
      * @param  \Closure|bool|null  $callback
      * @return bool
      */
-    public function confirmToProceed($warning = 'Application In Production', $callback = null)
+    public function confirmToProceed($warning = 'Application In Production!', $callback = null)
     {
         $callback = is_null($callback) ? $this->getDefaultConfirmCallback() : $callback;
 
-        $shouldConfirm = value($callback);
+        $shouldConfirm = $callback instanceof Closure ? call_user_func($callback) : $callback;
 
         if ($shouldConfirm) {
-            if ($this->hasOption('force') && $this->option('force')) {
+            if ($this->option('force')) {
                 return true;
             }
 
-            $this->components->alert($warning);
+            $this->alert($warning);
 
-            $confirmed = confirm('Are you sure you want to run this command?', default: false);
+            $confirmed = $this->confirm('Do you really wish to run this command?');
 
             if (! $confirmed) {
-                $this->components->warn('Command cancelled.');
+                $this->comment('Command Cancelled!');
 
                 return false;
             }
@@ -48,7 +48,7 @@ trait ConfirmableTrait
     protected function getDefaultConfirmCallback()
     {
         return function () {
-            return $this->getLaravel()->environment() === 'production';
+            return $this->getLaravel()->environment() == 'production';
         };
     }
 }

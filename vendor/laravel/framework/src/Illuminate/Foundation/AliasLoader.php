@@ -36,7 +36,6 @@ class AliasLoader
      * Create a new AliasLoader instance.
      *
      * @param  array  $aliases
-     * @return void
      */
     private function __construct($aliases)
     {
@@ -70,7 +69,7 @@ class AliasLoader
      */
     public function load($alias)
     {
-        if (static::$facadeNamespace && str_starts_with($alias, static::$facadeNamespace)) {
+        if (static::$facadeNamespace && strpos($alias, static::$facadeNamespace) === 0) {
             $this->loadFacade($alias);
 
             return true;
@@ -100,7 +99,7 @@ class AliasLoader
      */
     protected function ensureFacadeExists($alias)
     {
-        if (is_file($path = storage_path('framework/cache/facade-'.sha1($alias).'.php'))) {
+        if (file_exists($path = storage_path('framework/cache/facade-'.sha1($alias).'.php'))) {
             return $path;
         }
 
@@ -134,13 +133,13 @@ class AliasLoader
     /**
      * Add an alias to the loader.
      *
-     * @param  string  $alias
      * @param  string  $class
+     * @param  string  $alias
      * @return void
      */
-    public function alias($alias, $class)
+    public function alias($class, $alias)
     {
-        $this->aliases[$alias] = $class;
+        $this->aliases[$class] = $alias;
     }
 
     /**

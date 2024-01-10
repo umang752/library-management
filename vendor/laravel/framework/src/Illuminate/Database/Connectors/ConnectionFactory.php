@@ -2,15 +2,16 @@
 
 namespace Illuminate\Database\Connectors;
 
-use Illuminate\Contracts\Container\Container;
-use Illuminate\Database\Connection;
-use Illuminate\Database\MySqlConnection;
-use Illuminate\Database\PostgresConnection;
-use Illuminate\Database\SQLiteConnection;
-use Illuminate\Database\SqlServerConnection;
+use PDOException;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
-use PDOException;
+use Illuminate\Database\Connection;
+use Illuminate\Database\MySqlConnection;
+use Illuminate\Database\SQLiteConnection;
+use Illuminate\Database\PostgresConnection;
+use Illuminate\Database\SqlServerConnection;
+use Illuminate\Contracts\Container\Container;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 
 class ConnectionFactory
 {
@@ -35,8 +36,8 @@ class ConnectionFactory
     /**
      * Establish a PDO connection based on the configuration.
      *
-     * @param  array  $config
-     * @param  string|null  $name
+     * @param  array   $config
+     * @param  string  $name
      * @return \Illuminate\Database\Connection
      */
     public function make(array $config, $name = null)
@@ -53,7 +54,7 @@ class ConnectionFactory
     /**
      * Parse and prepare the database configuration.
      *
-     * @param  array  $config
+     * @param  array   $config
      * @param  string  $name
      * @return array
      */
@@ -78,7 +79,7 @@ class ConnectionFactory
     }
 
     /**
-     * Create a read / write database connection instance.
+     * Create a single database connection instance.
      *
      * @param  array  $config
      * @return \Illuminate\Database\Connection
@@ -115,7 +116,7 @@ class ConnectionFactory
     }
 
     /**
-     * Get the write configuration for a read / write connection.
+     * Get the read configuration for a read / write connection.
      *
      * @param  array  $config
      * @return array
@@ -130,7 +131,7 @@ class ConnectionFactory
     /**
      * Get a read / write level configuration.
      *
-     * @param  array  $config
+     * @param  array   $config
      * @param  string  $type
      * @return array
      */
@@ -171,19 +172,19 @@ class ConnectionFactory
      *
      * @param  array  $config
      * @return \Closure
-     *
-     * @throws \PDOException
      */
     protected function createPdoResolverWithHosts(array $config)
     {
         return function () use ($config) {
-            foreach (Arr::shuffle($this->parseHosts($config)) as $host) {
+            foreach (Arr::shuffle($hosts = $this->parseHosts($config)) as $key => $host) {
                 $config['host'] = $host;
 
                 try {
                     return $this->createConnector($config)->connect($config);
                 } catch (PDOException $e) {
-                    continue;
+                    if (count($hosts) - 1 === $key && $this->container->bound(ExceptionHandler::class)) {
+                        $this->container->make(ExceptionHandler::class)->report($e);
+                    }
                 }
             }
 
@@ -196,12 +197,10 @@ class ConnectionFactory
      *
      * @param  array  $config
      * @return array
-     *
-     * @throws \InvalidArgumentException
      */
     protected function parseHosts(array $config)
     {
-        $hosts = Arr::wrap($config['host']);
+        $hosts = array_wrap($config['host']);
 
         if (empty($hosts)) {
             throw new InvalidArgumentException('Database hosts array is empty.');
@@ -218,7 +217,9 @@ class ConnectionFactory
      */
     protected function createPdoResolverWithoutHosts(array $config)
     {
-        return fn () => $this->createConnector($config)->connect($config);
+        return function () use ($config) {
+            return $this->createConnector($config)->connect($config);
+        };
     }
 
     /**
@@ -239,23 +240,28 @@ class ConnectionFactory
             return $this->container->make($key);
         }
 
-        return match ($config['driver']) {
-            'mysql' => new MySqlConnector,
-            'pgsql' => new PostgresConnector,
-            'sqlite' => new SQLiteConnector,
-            'sqlsrv' => new SqlServerConnector,
-            default => throw new InvalidArgumentException("Unsupported driver [{$config['driver']}]."),
-        };
+        switch ($config['driver']) {
+            case 'mysql':
+                return new MySqlConnector;
+            case 'pgsql':
+                return new PostgresConnector;
+            case 'sqlite':
+                return new SQLiteConnector;
+            case 'sqlsrv':
+                return new SqlServerConnector;
+        }
+
+        throw new InvalidArgumentException("Unsupported driver [{$config['driver']}]");
     }
 
     /**
      * Create a new connection instance.
      *
-     * @param  string  $driver
-     * @param  \PDO|\Closure  $connection
-     * @param  string  $database
-     * @param  string  $prefix
-     * @param  array  $config
+     * @param  string   $driver
+     * @param  \PDO|\Closure     $connection
+     * @param  string   $database
+     * @param  string   $prefix
+     * @param  array    $config
      * @return \Illuminate\Database\Connection
      *
      * @throws \InvalidArgumentException
@@ -266,12 +272,17 @@ class ConnectionFactory
             return $resolver($connection, $database, $prefix, $config);
         }
 
-        return match ($driver) {
-            'mysql' => new MySqlConnection($connection, $database, $prefix, $config),
-            'pgsql' => new PostgresConnection($connection, $database, $prefix, $config),
-            'sqlite' => new SQLiteConnection($connection, $database, $prefix, $config),
-            'sqlsrv' => new SqlServerConnection($connection, $database, $prefix, $config),
-            default => throw new InvalidArgumentException("Unsupported driver [{$driver}]."),
-        };
+        switch ($driver) {
+            case 'mysql':
+                return new MySqlConnection($connection, $database, $prefix, $config);
+            case 'pgsql':
+                return new PostgresConnection($connection, $database, $prefix, $config);
+            case 'sqlite':
+                return new SQLiteConnection($connection, $database, $prefix, $config);
+            case 'sqlsrv':
+                return new SqlServerConnection($connection, $database, $prefix, $config);
+        }
+
+        throw new InvalidArgumentException("Unsupported driver [$driver]");
     }
 }

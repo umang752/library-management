@@ -1,26 +1,22 @@
-<?php declare(strict_types=1);
+<?php
 
 namespace PhpParser\Builder;
 
 use PhpParser;
-use PhpParser\BuilderHelpers;
 use PhpParser\Node;
 use PhpParser\Node\Stmt;
 
 class Function_ extends FunctionLike
 {
     protected $name;
-    protected $stmts = [];
-
-    /** @var Node\AttributeGroup[] */
-    protected $attributeGroups = [];
+    protected $stmts = array();
 
     /**
      * Creates a function builder.
      *
      * @param string $name Name of the function
      */
-    public function __construct(string $name) {
+    public function __construct($name) {
         $this->name = $name;
     }
 
@@ -32,20 +28,7 @@ class Function_ extends FunctionLike
      * @return $this The builder instance (for fluid interface)
      */
     public function addStmt($stmt) {
-        $this->stmts[] = BuilderHelpers::normalizeStmt($stmt);
-
-        return $this;
-    }
-
-    /**
-     * Adds an attribute group.
-     *
-     * @param Node\Attribute|Node\AttributeGroup $attribute
-     *
-     * @return $this The builder instance (for fluid interface)
-     */
-    public function addAttribute($attribute) {
-        $this->attributeGroups[] = BuilderHelpers::normalizeAttribute($attribute);
+        $this->stmts[] = $this->normalizeNode($stmt);
 
         return $this;
     }
@@ -55,13 +38,12 @@ class Function_ extends FunctionLike
      *
      * @return Stmt\Function_ The built function node
      */
-    public function getNode() : Node {
-        return new Stmt\Function_($this->name, [
+    public function getNode() {
+        return new Stmt\Function_($this->name, array(
             'byRef'      => $this->returnByRef,
             'params'     => $this->params,
             'returnType' => $this->returnType,
             'stmts'      => $this->stmts,
-            'attrGroups' => $this->attributeGroups,
-        ], $this->attributes);
+        ), $this->attributes);
     }
 }

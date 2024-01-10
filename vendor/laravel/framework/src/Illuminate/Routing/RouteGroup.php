@@ -11,22 +11,17 @@ class RouteGroup
      *
      * @param  array  $new
      * @param  array  $old
-     * @param  bool  $prependExistingPrefix
      * @return array
      */
-    public static function merge($new, $old, $prependExistingPrefix = true)
+    public static function merge($new, $old)
     {
         if (isset($new['domain'])) {
             unset($old['domain']);
         }
 
-        if (isset($new['controller'])) {
-            unset($old['controller']);
-        }
-
         $new = array_merge(static::formatAs($new, $old), [
             'namespace' => static::formatNamespace($new, $old),
-            'prefix' => static::formatPrefix($new, $old, $prependExistingPrefix),
+            'prefix' => static::formatPrefix($new, $old),
             'where' => static::formatWhere($new, $old),
         ]);
 
@@ -45,12 +40,12 @@ class RouteGroup
     protected static function formatNamespace($new, $old)
     {
         if (isset($new['namespace'])) {
-            return isset($old['namespace']) && ! str_starts_with($new['namespace'], '\\')
+            return isset($old['namespace'])
                     ? trim($old['namespace'], '\\').'\\'.trim($new['namespace'], '\\')
                     : trim($new['namespace'], '\\');
         }
 
-        return $old['namespace'] ?? null;
+        return isset($old['namespace']) ? $old['namespace'] : null;
     }
 
     /**
@@ -58,18 +53,13 @@ class RouteGroup
      *
      * @param  array  $new
      * @param  array  $old
-     * @param  bool  $prependExistingPrefix
      * @return string|null
      */
-    protected static function formatPrefix($new, $old, $prependExistingPrefix = true)
+    protected static function formatPrefix($new, $old)
     {
-        $old = $old['prefix'] ?? '';
+        $old = Arr::get($old, 'prefix');
 
-        if ($prependExistingPrefix) {
-            return isset($new['prefix']) ? trim($old, '/').'/'.trim($new['prefix'], '/') : $old;
-        }
-
-        return isset($new['prefix']) ? trim($new['prefix'], '/').'/'.trim($old, '/') : $old;
+        return isset($new['prefix']) ? trim($old, '/').'/'.trim($new['prefix'], '/') : $old;
     }
 
     /**
@@ -82,8 +72,8 @@ class RouteGroup
     protected static function formatWhere($new, $old)
     {
         return array_merge(
-            $old['where'] ?? [],
-            $new['where'] ?? []
+            isset($old['where']) ? $old['where'] : [],
+            isset($new['where']) ? $new['where'] : []
         );
     }
 
@@ -97,7 +87,7 @@ class RouteGroup
     protected static function formatAs($new, $old)
     {
         if (isset($old['as'])) {
-            $new['as'] = $old['as'].($new['as'] ?? '');
+            $new['as'] = $old['as'].Arr::get($new, 'as', '');
         }
 
         return $new;

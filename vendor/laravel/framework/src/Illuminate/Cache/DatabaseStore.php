@@ -3,18 +3,15 @@
 namespace Illuminate\Cache;
 
 use Closure;
-use Illuminate\Contracts\Cache\LockProvider;
+use Exception;
+use Carbon\Carbon;
 use Illuminate\Contracts\Cache\Store;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Database\PostgresConnection;
-use Illuminate\Database\QueryException;
-use Illuminate\Database\SqlServerConnection;
-use Illuminate\Support\InteractsWithTime;
-use Illuminate\Support\Str;
+use Illuminate\Contracts\Encryption\Encrypter as EncrypterContract;
 
-class DatabaseStore implements LockProvider, Store
+class DatabaseStore implements Store
 {
-    use InteractsWithTime, RetrievesMultipleKeys;
+    use RetrievesMultipleKeys;
 
     /**
      * The database connection instance.
@@ -24,11 +21,11 @@ class DatabaseStore implements LockProvider, Store
     protected $connection;
 
     /**
-     * The database connection instance that should be used to manage locks.
+     * The encrypter instance.
      *
-     * @var \Illuminate\Database\ConnectionInterface
+     * @var \Illuminate\Contracts\Encryption\Encrypter
      */
-    protected $lockConnection;
+    protected $encrypter;
 
     /**
      * The name of the cache table.
@@ -45,49 +42,21 @@ class DatabaseStore implements LockProvider, Store
     protected $prefix;
 
     /**
-     * The name of the cache locks table.
-     *
-     * @var string
-     */
-    protected $lockTable;
-
-    /**
-     * An array representation of the lock lottery odds.
-     *
-     * @var array
-     */
-    protected $lockLottery;
-
-    /**
-     * The default number of seconds that a lock should be held.
-     *
-     * @var int
-     */
-    protected $defaultLockTimeoutInSeconds;
-
-    /**
      * Create a new database store.
      *
      * @param  \Illuminate\Database\ConnectionInterface  $connection
+     * @param  \Illuminate\Contracts\Encryption\Encrypter  $encrypter
      * @param  string  $table
      * @param  string  $prefix
-     * @param  string  $lockTable
-     * @param  array  $lockLottery
      * @return void
      */
-    public function __construct(ConnectionInterface $connection,
-                                                    $table,
-                                                    $prefix = '',
-                                                    $lockTable = 'cache_locks',
-                                                    $lockLottery = [2, 100],
-                                                    $defaultLockTimeoutInSeconds = 86400)
+    public function __construct(ConnectionInterface $connection, EncrypterContract $encrypter,
+                                $table, $prefix = '')
     {
         $this->table = $table;
         $this->prefix = $prefix;
+        $this->encrypter = $encrypter;
         $this->connection = $connection;
-        $this->lockTable = $lockTable;
-        $this->lockLottery = $lockLottery;
-        $this->defaultLockTimeoutInSeconds = $defaultLockTimeoutInSeconds;
     }
 
     /**
@@ -114,70 +83,46 @@ class DatabaseStore implements LockProvider, Store
         // If this cache expiration date is past the current time, we will remove this
         // item from the cache. Then we will return a null value since the cache is
         // expired. We will use "Carbon" to make this comparison with the column.
-        if ($this->currentTime() >= $cache->expiration) {
-            $this->forgetIfExpired($key);
+        if (Carbon::now()->getTimestamp() >= $cache->expiration) {
+            $this->forget($key);
 
             return;
         }
 
-        return $this->unserialize($cache->value);
+        return $this->encrypter->decrypt($cache->value);
     }
 
     /**
-     * Store an item in the cache for a given number of seconds.
+     * Store an item in the cache for a given number of minutes.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
-     * @return bool
+     * @param  mixed   $value
+     * @param  float|int  $minutes
+     * @return void
      */
-    public function put($key, $value, $seconds)
+    public function put($key, $value, $minutes)
     {
         $key = $this->prefix.$key;
-        $value = $this->serialize($value);
-        $expiration = $this->getTime() + $seconds;
 
-        return $this->table()->upsert(compact('key', 'value', 'expiration'), 'key') > 0;
-    }
+        // All of the cached values in the database are encrypted in case this is used
+        // as a session data store by the consumer. We'll also calculate the expire
+        // time and place that on the table so we will check it on our retrieval.
+        $value = $this->encrypter->encrypt($value);
 
-    /**
-     * Store an item in the cache if the key doesn't exist.
-     *
-     * @param  string  $key
-     * @param  mixed  $value
-     * @param  int  $seconds
-     * @return bool
-     */
-    public function add($key, $value, $seconds)
-    {
-        if (! is_null($this->get($key))) {
-            return false;
-        }
-
-        $key = $this->prefix.$key;
-        $value = $this->serialize($value);
-        $expiration = $this->getTime() + $seconds;
-
-        $doesntSupportInsertOrIgnore = [SqlServerConnection::class];
-
-        if (! in_array(get_class($this->getConnection()), $doesntSupportInsertOrIgnore)) {
-            return $this->table()->insertOrIgnore(compact('key', 'value', 'expiration')) > 0;
-        }
+        $expiration = $this->getTime() + (int) ($minutes * 60);
 
         try {
-            return $this->table()->insert(compact('key', 'value', 'expiration'));
-        } catch (QueryException) {
-            // ...
+            $this->table()->insert(compact('key', 'value', 'expiration'));
+        } catch (Exception $e) {
+            $this->table()->where('key', $key)->update(compact('value', 'expiration'));
         }
-
-        return false;
     }
 
     /**
      * Increment the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int|bool
      */
     public function increment($key, $value = 1)
@@ -191,7 +136,7 @@ class DatabaseStore implements LockProvider, Store
      * Decrement the value of an item in the cache.
      *
      * @param  string  $key
-     * @param  mixed  $value
+     * @param  mixed   $value
      * @return int|bool
      */
     public function decrement($key, $value = 1)
@@ -226,7 +171,7 @@ class DatabaseStore implements LockProvider, Store
 
             $cache = is_array($cache) ? (object) $cache : $cache;
 
-            $current = $this->unserialize($cache->value);
+            $current = $this->encrypter->decrypt($cache->value);
 
             // Here we'll call this callback function that was given to the function which
             // is used to either increment or decrement the function. We use a callback
@@ -241,7 +186,7 @@ class DatabaseStore implements LockProvider, Store
             // since database cache values are encrypted by default with secure storage
             // that can't be easily read. We will return the new value after storing.
             $this->table()->where('key', $prefixed)->update([
-                'value' => $this->serialize($new),
+                'value' => $this->encrypter->encrypt($new),
             ]);
 
             return $new;
@@ -255,52 +200,19 @@ class DatabaseStore implements LockProvider, Store
      */
     protected function getTime()
     {
-        return $this->currentTime();
+        return Carbon::now()->getTimestamp();
     }
 
     /**
      * Store an item in the cache indefinitely.
      *
      * @param  string  $key
-     * @param  mixed  $value
-     * @return bool
+     * @param  mixed   $value
+     * @return void
      */
     public function forever($key, $value)
     {
-        return $this->put($key, $value, 315360000);
-    }
-
-    /**
-     * Get a lock instance.
-     *
-     * @param  string  $name
-     * @param  int  $seconds
-     * @param  string|null  $owner
-     * @return \Illuminate\Contracts\Cache\Lock
-     */
-    public function lock($name, $seconds = 0, $owner = null)
-    {
-        return new DatabaseLock(
-            $this->lockConnection ?? $this->connection,
-            $this->lockTable,
-            $this->prefix.$name,
-            $seconds,
-            $owner,
-            $this->lockLottery,
-            $this->defaultLockTimeoutInSeconds
-        );
-    }
-
-    /**
-     * Restore a lock instance using the owner identifier.
-     *
-     * @param  string  $name
-     * @param  string  $owner
-     * @return \Illuminate\Contracts\Cache\Lock
-     */
-    public function restoreLock($name, $owner)
-    {
-        return $this->lock($name, 0, $owner);
+        $this->put($key, $value, 5256000);
     }
 
     /**
@@ -317,31 +229,13 @@ class DatabaseStore implements LockProvider, Store
     }
 
     /**
-     * Remove an item from the cache if it is expired.
-     *
-     * @param  string  $key
-     * @return bool
-     */
-    public function forgetIfExpired($key)
-    {
-        $this->table()
-            ->where('key', '=', $this->prefix.$key)
-            ->where('expiration', '<=', $this->getTime())
-            ->delete();
-
-        return true;
-    }
-
-    /**
      * Remove all items from the cache.
      *
      * @return bool
      */
     public function flush()
     {
-        $this->table()->delete();
-
-        return true;
+        return (bool) $this->table()->delete();
     }
 
     /**
@@ -365,16 +259,13 @@ class DatabaseStore implements LockProvider, Store
     }
 
     /**
-     * Specify the name of the connection that should be used to manage locks.
+     * Get the encrypter instance.
      *
-     * @param  \Illuminate\Database\ConnectionInterface  $connection
-     * @return $this
+     * @return \Illuminate\Contracts\Encryption\Encrypter
      */
-    public function setLockConnection($connection)
+    public function getEncrypter()
     {
-        $this->lockConnection = $connection;
-
-        return $this;
+        return $this->encrypter;
     }
 
     /**
@@ -385,37 +276,5 @@ class DatabaseStore implements LockProvider, Store
     public function getPrefix()
     {
         return $this->prefix;
-    }
-
-    /**
-     * Serialize the given value.
-     *
-     * @param  mixed  $value
-     * @return string
-     */
-    protected function serialize($value)
-    {
-        $result = serialize($value);
-
-        if ($this->connection instanceof PostgresConnection && str_contains($result, "\0")) {
-            $result = base64_encode($result);
-        }
-
-        return $result;
-    }
-
-    /**
-     * Unserialize the given value.
-     *
-     * @param  string  $value
-     * @return mixed
-     */
-    protected function unserialize($value)
-    {
-        if ($this->connection instanceof PostgresConnection && ! Str::contains($value, [':', ';'])) {
-            $value = base64_decode($value);
-        }
-
-        return unserialize($value);
     }
 }

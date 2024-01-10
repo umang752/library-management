@@ -17,21 +17,14 @@ use Symfony\Component\VarDumper\Cloner\Stub;
  * Casts DateTimeInterface related classes to array representation.
  *
  * @author Dany Maillard <danymaillard93b@gmail.com>
- *
- * @final
  */
 class DateCaster
 {
-    private const PERIOD_LIMIT = 3;
-
-    /**
-     * @return array
-     */
-    public static function castDateTime(\DateTimeInterface $d, array $a, Stub $stub, bool $isNested, int $filter)
+    public static function castDateTime(\DateTimeInterface $d, array $a, Stub $stub, $isNested, $filter)
     {
         $prefix = Caster::PREFIX_VIRTUAL;
-        $location = $d->getTimezone() ? $d->getTimezone()->getLocation() : null;
-        $fromNow = (new \DateTimeImmutable())->diff($d);
+        $location = $d->getTimezone()->getLocation();
+        $fromNow = (new \DateTime())->diff($d);
 
         $title = $d->format('l, F j, Y')
             ."\n".self::formatInterval($fromNow).' from now'
@@ -50,12 +43,9 @@ class DateCaster
         return $a;
     }
 
-    /**
-     * @return array
-     */
-    public static function castInterval(\DateInterval $interval, array $a, Stub $stub, bool $isNested, int $filter)
+    public static function castInterval(\DateInterval $interval, array $a, Stub $stub, $isNested, $filter)
     {
-        $now = new \DateTimeImmutable('@0', new \DateTimeZone('UTC'));
+        $now = new \DateTimeImmutable();
         $numberOfSeconds = $now->add($interval)->getTimestamp() - $now->getTimestamp();
         $title = number_format($numberOfSeconds, 0, '.', ' ').'s';
 
@@ -64,62 +54,66 @@ class DateCaster
         return $filter & Caster::EXCLUDE_VERBOSE ? $i : $i + $a;
     }
 
-    private static function formatInterval(\DateInterval $i): string
+    private static function formatInterval(\DateInterval $i)
     {
         $format = '%R ';
 
         if (0 === $i->y && 0 === $i->m && ($i->h >= 24 || $i->i >= 60 || $i->s >= 60)) {
-            $d = new \DateTimeImmutable('@0', new \DateTimeZone('UTC'));
-            $i = $d->diff($d->add($i)); // recalculate carry over points
+            $i = date_diff($d = new \DateTime(), date_add(clone $d, $i)); // recalculate carry over points
             $format .= 0 < $i->days ? '%ad ' : '';
         } else {
             $format .= ($i->y ? '%yy ' : '').($i->m ? '%mm ' : '').($i->d ? '%dd ' : '');
         }
 
-        $format .= $i->h || $i->i || $i->s || $i->f ? '%H:%I:'.self::formatSeconds($i->s, substr($i->f, 2)) : '';
+        if (\PHP_VERSION_ID >= 70100 && isset($i->f)) {
+            $format .= $i->h || $i->i || $i->s || $i->f ? '%H:%I:'.self::formatSeconds($i->s, substr($i->f, 2)) : '';
+        } else {
+            $format .= $i->h || $i->i || $i->s ? '%H:%I:%S' : '';
+        }
+
         $format = '%R ' === $format ? '0s' : $format;
 
         return $i->format(rtrim($format));
     }
 
-    /**
-     * @return array
-     */
-    public static function castTimeZone(\DateTimeZone $timeZone, array $a, Stub $stub, bool $isNested, int $filter)
+    public static function castTimeZone(\DateTimeZone $timeZone, array $a, Stub $stub, $isNested, $filter)
     {
         $location = $timeZone->getLocation();
-        $formatted = (new \DateTimeImmutable('now', $timeZone))->format($location ? 'e (P)' : 'P');
-        $title = $location && \extension_loaded('intl') ? \Locale::getDisplayRegion('-'.$location['country_code']) : '';
+        $formatted = (new \DateTime('now', $timeZone))->format($location ? 'e (P)' : 'P');
+        $title = $location && \extension_loaded('intl') ? \Locale::getDisplayRegion('-'.$location['country_code'], \Locale::getDefault()) : '';
 
         $z = [Caster::PREFIX_VIRTUAL.'timezone' => new ConstStub($formatted, $title)];
 
         return $filter & Caster::EXCLUDE_VERBOSE ? $z : $z + $a;
     }
 
-    /**
-     * @return array
-     */
-    public static function castPeriod(\DatePeriod $p, array $a, Stub $stub, bool $isNested, int $filter)
+    public static function castPeriod(\DatePeriod $p, array $a, Stub $stub, $isNested, $filter)
     {
+        if (\defined('HHVM_VERSION_ID') || \PHP_VERSION_ID < 50620 || (\PHP_VERSION_ID >= 70000 && \PHP_VERSION_ID < 70005)) { // see https://bugs.php.net/71635
+            return $a;
+        }
+
         $dates = [];
-        foreach (clone $p as $i => $d) {
-            if (self::PERIOD_LIMIT === $i) {
-                $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
-                $dates[] = sprintf('%s more', ($end = $p->getEndDate())
-                    ? ceil(($end->format('U.u') - $d->format('U.u')) / ((int) $now->add($p->getDateInterval())->format('U.u') - (int) $now->format('U.u')))
-                    : $p->recurrences - $i
-                );
-                break;
+        if (\PHP_VERSION_ID >= 70107) { // see https://bugs.php.net/74639
+            foreach (clone $p as $i => $d) {
+                if (3 === $i) {
+                    $now = new \DateTimeImmutable();
+                    $dates[] = sprintf('%s more', ($end = $p->getEndDate())
+                        ? ceil(($end->format('U.u') - $d->format('U.u')) / ((int) $now->add($p->getDateInterval())->format('U.u') - (int) $now->format('U.u')))
+                        : $p->recurrences - $i
+                    );
+                    break;
+                }
+                $dates[] = sprintf('%s) %s', $i + 1, self::formatDateTime($d));
             }
-            $dates[] = sprintf('%s) %s', $i + 1, self::formatDateTime($d));
         }
 
         $period = sprintf(
-            'every %s, from %s%s %s',
+            'every %s, from %s (%s) %s',
             self::formatInterval($p->getDateInterval()),
-            $p->include_start_date ? '[' : ']',
             self::formatDateTime($p->getStartDate()),
-            ($end = $p->getEndDate()) ? 'to '.self::formatDateTime($end).(\PHP_VERSION_ID >= 80200 && $p->include_end_date ? ']' : '[') : 'recurring '.$p->recurrences.' time/s'
+            $p->include_start_date ? 'included' : 'excluded',
+            ($end = $p->getEndDate()) ? 'to '.self::formatDateTime($end) : 'recurring '.$p->recurrences.' time/s'
         );
 
         $p = [Caster::PREFIX_VIRTUAL.'period' => new ConstStub($period, implode("\n", $dates))];
@@ -127,12 +121,12 @@ class DateCaster
         return $filter & Caster::EXCLUDE_VERBOSE ? $p : $p + $a;
     }
 
-    private static function formatDateTime(\DateTimeInterface $d, string $extra = ''): string
+    private static function formatDateTime(\DateTimeInterface $d, $extra = '')
     {
         return $d->format('Y-m-d H:i:'.self::formatSeconds($d->format('s'), $d->format('u')).$extra);
     }
 
-    private static function formatSeconds(string $s, string $us): string
+    private static function formatSeconds($s, $us)
     {
         return sprintf('%02d.%s', $s, 0 === ($len = \strlen($t = rtrim($us, '0'))) ? '0' : ($len <= 3 ? str_pad($t, 3, '0') : $us));
     }

@@ -2,27 +2,17 @@
 
 namespace Illuminate\Cache;
 
-use Closure;
+use Carbon\Carbon;
 use Illuminate\Contracts\Cache\Repository as Cache;
-use Illuminate\Support\InteractsWithTime;
 
 class RateLimiter
 {
-    use InteractsWithTime;
-
     /**
      * The cache store implementation.
      *
      * @var \Illuminate\Contracts\Cache\Repository
      */
     protected $cache;
-
-    /**
-     * The configured limit object resolvers.
-     *
-     * @var array
-     */
-    protected $limiters = [];
 
     /**
      * Create a new rate limiter instance.
@@ -36,95 +26,59 @@ class RateLimiter
     }
 
     /**
-     * Register a named limiter configuration.
-     *
-     * @param  string  $name
-     * @param  \Closure  $callback
-     * @return $this
-     */
-    public function for(string $name, Closure $callback)
-    {
-        $this->limiters[$name] = $callback;
-
-        return $this;
-    }
-
-    /**
-     * Get the given named rate limiter.
-     *
-     * @param  string  $name
-     * @return \Closure|null
-     */
-    public function limiter(string $name)
-    {
-        return $this->limiters[$name] ?? null;
-    }
-
-    /**
-     * Attempts to execute a callback if it's not limited.
-     *
-     * @param  string  $key
-     * @param  int  $maxAttempts
-     * @param  \Closure  $callback
-     * @param  int  $decaySeconds
-     * @return mixed
-     */
-    public function attempt($key, $maxAttempts, Closure $callback, $decaySeconds = 60)
-    {
-        if ($this->tooManyAttempts($key, $maxAttempts)) {
-            return false;
-        }
-
-        if (is_null($result = $callback())) {
-            $result = true;
-        }
-
-        return tap($result, function () use ($key, $decaySeconds) {
-            $this->hit($key, $decaySeconds);
-        });
-    }
-
-    /**
      * Determine if the given key has been "accessed" too many times.
      *
      * @param  string  $key
      * @param  int  $maxAttempts
+     * @param  float|int  $decayMinutes
      * @return bool
      */
-    public function tooManyAttempts($key, $maxAttempts)
+    public function tooManyAttempts($key, $maxAttempts, $decayMinutes = 1)
     {
+        if ($this->cache->has($key.':lockout')) {
+            return true;
+        }
+
         if ($this->attempts($key) >= $maxAttempts) {
-            if ($this->cache->has($this->cleanRateLimiterKey($key).':timer')) {
-                return true;
-            }
+            $this->lockout($key, $decayMinutes);
 
             $this->resetAttempts($key);
+
+            return true;
         }
 
         return false;
     }
 
     /**
+     * Add the lockout key to the cache.
+     *
+     * @param  string  $key
+     * @param  int  $decayMinutes
+     * @return void
+     */
+    protected function lockout($key, $decayMinutes)
+    {
+        $this->cache->add(
+            $key.':lockout', Carbon::now()->getTimestamp() + ($decayMinutes * 60), $decayMinutes
+        );
+    }
+
+    /**
      * Increment the counter for a given key for a given decay time.
      *
      * @param  string  $key
-     * @param  int  $decaySeconds
+     * @param  float|int  $decayMinutes
      * @return int
      */
-    public function hit($key, $decaySeconds = 60)
+    public function hit($key, $decayMinutes = 1)
     {
-        $key = $this->cleanRateLimiterKey($key);
-
-        $this->cache->add(
-            $key.':timer', $this->availableAt($decaySeconds), $decaySeconds
-        );
-
-        $added = $this->cache->add($key, 0, $decaySeconds);
+        $added = $this->cache->add($key, 0, $decayMinutes);
 
         $hits = (int) $this->cache->increment($key);
 
         if (! $added && $hits == 1) {
-            $this->cache->put($key, 1, $decaySeconds);
+            $this->cache->put($key, 1, $decayMinutes);
         }
 
         return $hits;
@@ -138,8 +92,6 @@ class RateLimiter
      */
     public function attempts($key)
     {
-        $key = $this->cleanRateLimiterKey($key);
-
         return $this->cache->get($key, 0);
     }
 
@@ -151,25 +103,7 @@ class RateLimiter
      */
     public function resetAttempts($key)
     {
-        $key = $this->cleanRateLimiterKey($key);
-
         return $this->cache->forget($key);
-    }
-
-    /**
-     * Get the number of retries left for the given key.
-     *
-     * @param  string  $key
-     * @param  int  $maxAttempts
-     * @return int
-     */
-    public function remaining($key, $maxAttempts)
-    {
-        $key = $this->cleanRateLimiterKey($key);
-
-        $attempts = $this->attempts($key);
-
-        return $maxAttempts - $attempts;
     }
 
     /**
@@ -181,22 +115,22 @@ class RateLimiter
      */
     public function retriesLeft($key, $maxAttempts)
     {
-        return $this->remaining($key, $maxAttempts);
+        $attempts = $this->attempts($key);
+
+        return $maxAttempts - $attempts;
     }
 
     /**
-     * Clear the hits and lockout timer for the given key.
+     * Clear the hits and lockout for the given key.
      *
      * @param  string  $key
      * @return void
      */
     public function clear($key)
     {
-        $key = $this->cleanRateLimiterKey($key);
-
         $this->resetAttempts($key);
 
-        $this->cache->forget($key.':timer');
+        $this->cache->forget($key.':lockout');
     }
 
     /**
@@ -207,19 +141,6 @@ class RateLimiter
      */
     public function availableIn($key)
     {
-        $key = $this->cleanRateLimiterKey($key);
-
-        return max(0, $this->cache->get($key.':timer') - $this->currentTime());
-    }
-
-    /**
-     * Clean the rate limiter key from unicode characters.
-     *
-     * @param  string  $key
-     * @return string
-     */
-    public function cleanRateLimiterKey($key)
-    {
-        return preg_replace('/&([a-z])[a-z]+;/i', '$1', htmlentities($key));
+        return $this->cache->get($key.':lockout') - Carbon::now()->getTimestamp();
     }
 }

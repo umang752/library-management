@@ -13,77 +13,97 @@ namespace Symfony\Component\Translation;
 
 use Symfony\Component\HttpKernel\CacheWarmer\WarmableInterface;
 use Symfony\Component\Translation\Exception\InvalidArgumentException;
-use Symfony\Contracts\Translation\LocaleAwareInterface;
-use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * @author Abdellatif Ait boudad <a.aitboudad@gmail.com>
  */
-class DataCollectorTranslator implements TranslatorInterface, TranslatorBagInterface, LocaleAwareInterface, WarmableInterface
+class DataCollectorTranslator implements TranslatorInterface, TranslatorBagInterface, WarmableInterface
 {
-    public const MESSAGE_DEFINED = 0;
-    public const MESSAGE_MISSING = 1;
-    public const MESSAGE_EQUALS_FALLBACK = 2;
-
-    private TranslatorInterface $translator;
-    private array $messages = [];
+    const MESSAGE_DEFINED = 0;
+    const MESSAGE_MISSING = 1;
+    const MESSAGE_EQUALS_FALLBACK = 2;
 
     /**
-     * @param TranslatorInterface&TranslatorBagInterface&LocaleAwareInterface $translator
+     * @var TranslatorInterface|TranslatorBagInterface
+     */
+    private $translator;
+
+    private $messages = [];
+
+    /**
+     * @param TranslatorInterface $translator The translator must implement TranslatorBagInterface
      */
     public function __construct(TranslatorInterface $translator)
     {
-        if (!$translator instanceof TranslatorBagInterface || !$translator instanceof LocaleAwareInterface) {
-            throw new InvalidArgumentException(sprintf('The Translator "%s" must implement TranslatorInterface, TranslatorBagInterface and LocaleAwareInterface.', get_debug_type($translator)));
+        if (!$translator instanceof TranslatorBagInterface) {
+            throw new InvalidArgumentException(sprintf('The Translator "%s" must implement TranslatorInterface and TranslatorBagInterface.', \get_class($translator)));
         }
 
         $this->translator = $translator;
     }
 
-    public function trans(?string $id, array $parameters = [], string $domain = null, string $locale = null): string
+    /**
+     * {@inheritdoc}
+     */
+    public function trans($id, array $parameters = [], $domain = null, $locale = null)
     {
-        $trans = $this->translator->trans($id = (string) $id, $parameters, $domain, $locale);
+        $trans = $this->translator->trans($id, $parameters, $domain, $locale);
         $this->collectMessage($locale, $domain, $id, $trans, $parameters);
 
         return $trans;
     }
 
     /**
-     * @return void
+     * {@inheritdoc}
      */
-    public function setLocale(string $locale)
+    public function transChoice($id, $number, array $parameters = [], $domain = null, $locale = null)
+    {
+        $trans = $this->translator->transChoice($id, $number, $parameters, $domain, $locale);
+        $this->collectMessage($locale, $domain, $id, $trans, $parameters, $number);
+
+        return $trans;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function setLocale($locale)
     {
         $this->translator->setLocale($locale);
     }
 
-    public function getLocale(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getLocale()
     {
         return $this->translator->getLocale();
     }
 
-    public function getCatalogue(string $locale = null): MessageCatalogueInterface
+    /**
+     * {@inheritdoc}
+     */
+    public function getCatalogue($locale = null)
     {
         return $this->translator->getCatalogue($locale);
     }
 
-    public function getCatalogues(): array
-    {
-        return $this->translator->getCatalogues();
-    }
-
-    public function warmUp(string $cacheDir, string $buildDir = null): array
+    /**
+     * {@inheritdoc}
+     */
+    public function warmUp($cacheDir)
     {
         if ($this->translator instanceof WarmableInterface) {
-            return (array) $this->translator->warmUp($cacheDir, $buildDir);
+            $this->translator->warmUp($cacheDir);
         }
-
-        return [];
     }
 
     /**
      * Gets the fallback locales.
+     *
+     * @return array The fallback locales
      */
-    public function getFallbackLocales(): array
+    public function getFallbackLocales()
     {
         if ($this->translator instanceof Translator || method_exists($this->translator, 'getFallbackLocales')) {
             return $this->translator->getFallbackLocales();
@@ -93,22 +113,36 @@ class DataCollectorTranslator implements TranslatorInterface, TranslatorBagInter
     }
 
     /**
-     * @return mixed
+     * Passes through all unknown calls onto the translator object.
      */
-    public function __call(string $method, array $args)
+    public function __call($method, $args)
     {
-        return $this->translator->{$method}(...$args);
+        return \call_user_func_array([$this->translator, $method], $args);
     }
 
-    public function getCollectedMessages(): array
+    /**
+     * @return array
+     */
+    public function getCollectedMessages()
     {
         return $this->messages;
     }
 
-    private function collectMessage(?string $locale, ?string $domain, string $id, string $translation, ?array $parameters = []): void
+    /**
+     * @param string|null $locale
+     * @param string|null $domain
+     * @param string      $id
+     * @param string      $translation
+     * @param array|null  $parameters
+     * @param int|null    $number
+     */
+    private function collectMessage($locale, $domain, $id, $translation, $parameters = [], $number = null)
     {
-        $domain ??= 'messages';
+        if (null === $domain) {
+            $domain = 'messages';
+        }
 
+        $id = (string) $id;
         $catalogue = $this->translator->getCatalogue($locale);
         $locale = $catalogue->getLocale();
         $fallbackLocale = null;
@@ -136,8 +170,8 @@ class DataCollectorTranslator implements TranslatorInterface, TranslatorBagInter
             'id' => $id,
             'translation' => $translation,
             'parameters' => $parameters,
+            'transChoiceNumber' => $number,
             'state' => $state,
-            'transChoiceNumber' => isset($parameters['%count%']) && is_numeric($parameters['%count%']) ? $parameters['%count%'] : null,
         ];
     }
 }

@@ -3,7 +3,7 @@
 /*
  * This file is part of Psy Shell.
  *
- * (c) 2012-2023 Justin Hileman
+ * (c) 2012-2018 Justin Hileman
  *
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
@@ -13,19 +13,18 @@ namespace Psy;
 
 use Psy\Exception\DeprecatedException;
 use Psy\Exception\RuntimeException;
-use Psy\ExecutionLoop\ProcessForker;
 use Psy\Output\OutputPager;
 use Psy\Output\ShellOutput;
-use Psy\Output\Theme;
+use Psy\Readline\GNUReadline;
+use Psy\Readline\HoaConsole;
+use Psy\Readline\Libedit;
+use Psy\Readline\Readline;
 use Psy\TabCompletion\AutoCompleter;
 use Psy\VarDumper\Presenter;
 use Psy\VersionUpdater\Checker;
 use Psy\VersionUpdater\GitHubChecker;
 use Psy\VersionUpdater\IntervalChecker;
 use Psy\VersionUpdater\NoopChecker;
-use Symfony\Component\Console\Formatter\OutputFormatterStyle;
-use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -33,19 +32,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class Configuration
 {
-    const COLOR_MODE_AUTO = 'auto';
-    const COLOR_MODE_FORCED = 'forced';
+    const COLOR_MODE_AUTO     = 'auto';
+    const COLOR_MODE_FORCED   = 'forced';
     const COLOR_MODE_DISABLED = 'disabled';
-
-    const INTERACTIVE_MODE_AUTO = 'auto';
-    const INTERACTIVE_MODE_FORCED = 'forced';
-    const INTERACTIVE_MODE_DISABLED = 'disabled';
-
-    const VERBOSITY_QUIET = 'quiet';
-    const VERBOSITY_NORMAL = 'normal';
-    const VERBOSITY_VERBOSE = 'verbose';
-    const VERBOSITY_VERY_VERBOSE = 'very_verbose';
-    const VERBOSITY_DEBUG = 'debug';
 
     private static $AVAILABLE_OPTIONS = [
         'codeCleaner',
@@ -56,28 +45,20 @@ class Configuration
         'eraseDuplicates',
         'errorLoggingLevel',
         'forceArrayIndexes',
-        'formatterStyles',
-        'historyFile',
         'historySize',
-        'interactiveMode',
         'manualDbFile',
         'pager',
         'prompt',
-        'rawOutput',
         'requireSemicolons',
         'runtimeDir',
         'startupMessage',
-        'strictTypes',
-        'theme',
         'updateCheck',
         'useBracketedPaste',
         'usePcntl',
         'useReadline',
         'useTabCompletion',
         'useUnicode',
-        'verbosity',
         'warnOnMultipleConfigs',
-        'yolo',
     ];
 
     private $defaultIncludes;
@@ -95,32 +76,20 @@ class Configuration
     private $useBracketedPaste;
     private $hasPcntl;
     private $usePcntl;
-    private $newCommands = [];
-    private $pipedInput;
-    private $pipedOutput;
-    private $rawOutput = false;
+    private $newCommands       = [];
     private $requireSemicolons = false;
-    private $strictTypes = false;
     private $useUnicode;
     private $useTabCompletion;
     private $newMatchers = [];
-    private $errorLoggingLevel = \E_ALL;
+    private $errorLoggingLevel = E_ALL;
     private $warnOnMultipleConfigs = false;
-    private $colorMode = self::COLOR_MODE_AUTO;
-    private $interactiveMode = self::INTERACTIVE_MODE_AUTO;
+    private $colorMode;
     private $updateCheck;
     private $startupMessage;
     private $forceArrayIndexes = false;
-    /** @deprecated */
-    private $formatterStyles = [];
-    private $verbosity = self::VERBOSITY_NORMAL;
-    private $yolo = false;
-    /** @var Theme */
-    private $theme;
 
     // services
     private $readline;
-    /** @var ShellOutput */
     private $output;
     private $shell;
     private $cleaner;
@@ -129,9 +98,7 @@ class Configuration
     private $presenter;
     private $autoCompleter;
     private $checker;
-    /** @deprecated */
     private $prompt;
-    private $configPaths;
 
     /**
      * Construct a Configuration instance.
@@ -142,20 +109,18 @@ class Configuration
      */
     public function __construct(array $config = [])
     {
-        $this->configPaths = new ConfigPaths();
+        $this->setColorMode(self::COLOR_MODE_AUTO);
 
         // explicit configFile option
         if (isset($config['configFile'])) {
             $this->configFile = $config['configFile'];
-        } elseif (isset($_SERVER['PSYSH_CONFIG']) && $_SERVER['PSYSH_CONFIG']) {
-            $this->configFile = $_SERVER['PSYSH_CONFIG'];
-        } elseif (\PHP_SAPI === 'cli-server' && ($configFile = \getenv('PSYSH_CONFIG'))) {
+        } elseif ($configFile = \getenv('PSYSH_CONFIG')) {
             $this->configFile = $configFile;
         }
 
         // legacy baseDir option
         if (isset($config['baseDir'])) {
-            $msg = "The 'baseDir' configuration option is deprecated; ".
+            $msg = "The 'baseDir' configuration option is deprecated; " .
                 "please specify 'configDir' and 'dataDir' options instead";
             throw new DeprecatedException($msg);
         }
@@ -165,213 +130,6 @@ class Configuration
         // go go gadget, config!
         $this->loadConfig($config);
         $this->init();
-    }
-
-    /**
-     * Construct a Configuration object from Symfony Console input.
-     *
-     * This is great for adding psysh-compatible command line options to framework- or app-specific
-     * wrappers.
-     *
-     * $input should already be bound to an appropriate InputDefinition (see self::getInputOptions
-     * if you want to build your own) before calling this method. It's not required, but things work
-     * a lot better if we do.
-     *
-     * @see self::getInputOptions
-     *
-     * @throws \InvalidArgumentException
-     *
-     * @param InputInterface $input
-     */
-    public static function fromInput(InputInterface $input): self
-    {
-        $config = new self(['configFile' => self::getConfigFileFromInput($input)]);
-
-        // Handle --color and --no-color (and --ansi and --no-ansi aliases)
-        if (self::getOptionFromInput($input, ['color', 'ansi'])) {
-            $config->setColorMode(self::COLOR_MODE_FORCED);
-        } elseif (self::getOptionFromInput($input, ['no-color', 'no-ansi'])) {
-            $config->setColorMode(self::COLOR_MODE_DISABLED);
-        }
-
-        // Handle verbosity options
-        if ($verbosity = self::getVerbosityFromInput($input)) {
-            $config->setVerbosity($verbosity);
-        }
-
-        // Handle interactive mode
-        if (self::getOptionFromInput($input, ['interactive', 'interaction'], ['-a', '-i'])) {
-            $config->setInteractiveMode(self::INTERACTIVE_MODE_FORCED);
-        } elseif (self::getOptionFromInput($input, ['no-interactive', 'no-interaction'], ['-n'])) {
-            $config->setInteractiveMode(self::INTERACTIVE_MODE_DISABLED);
-        }
-
-        // Handle --compact
-        if (self::getOptionFromInput($input, ['compact'])) {
-            $config->setTheme('compact');
-        }
-
-        // Handle --raw-output
-        // @todo support raw output with interactive input?
-        if (!$config->getInputInteractive()) {
-            if (self::getOptionFromInput($input, ['raw-output'], ['-r'])) {
-                $config->setRawOutput(true);
-            }
-        }
-
-        // Handle --yolo
-        if (self::getOptionFromInput($input, ['yolo'])) {
-            $config->setYolo(true);
-        }
-
-        return $config;
-    }
-
-    /**
-     * Get the desired config file from the given input.
-     *
-     * @return string|null config file path, or null if none is specified
-     */
-    private static function getConfigFileFromInput(InputInterface $input)
-    {
-        // Best case, input is properly bound and validated.
-        if ($input->hasOption('config')) {
-            return $input->getOption('config');
-        }
-
-        return $input->getParameterOption('--config', null, true) ?: $input->getParameterOption('-c', null, true);
-    }
-
-    /**
-     * Get a boolean option from the given input.
-     *
-     * This helper allows fallback for unbound and unvalidated input. It's not perfect--for example,
-     * it can't deal with several short options squished together--but it's better than falling over
-     * any time someone gives us unbound input.
-     *
-     * @return bool true if the option (or an alias) is present
-     */
-    private static function getOptionFromInput(InputInterface $input, array $names, array $otherParams = []): bool
-    {
-        // Best case, input is properly bound and validated.
-        foreach ($names as $name) {
-            if ($input->hasOption($name) && $input->getOption($name)) {
-                return true;
-            }
-        }
-
-        foreach ($names as $name) {
-            $otherParams[] = '--'.$name;
-        }
-
-        foreach ($otherParams as $name) {
-            if ($input->hasParameterOption($name, true)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Get the desired verbosity from the given input.
-     *
-     * This is a bit more complext than the other options parsers. It handles `--quiet` and
-     * `--verbose`, along with their short aliases, and fancy things like `-vvv`.
-     *
-     * @return string|null configuration constant, or null if no verbosity option is specified
-     */
-    private static function getVerbosityFromInput(InputInterface $input)
-    {
-        // --quiet wins!
-        if (self::getOptionFromInput($input, ['quiet'], ['-q'])) {
-            return self::VERBOSITY_QUIET;
-        }
-
-        // Best case, input is properly bound and validated.
-        //
-        // Note that if the `--verbose` option is incorrectly defined as `VALUE_NONE` rather than
-        // `VALUE_OPTIONAL` (as it is in Symfony Console by default) it doesn't actually work with
-        // multiple verbosity levels as it claims.
-        //
-        // We can detect this by checking whether the the value === true, and fall back to unbound
-        // parsing for this option.
-        if ($input->hasOption('verbose') && $input->getOption('verbose') !== true) {
-            switch ($input->getOption('verbose')) {
-                case '-1':
-                    return self::VERBOSITY_QUIET;
-                case '0': // explicitly normal, overrides config file default
-                    return self::VERBOSITY_NORMAL;
-                case '1':
-                case null: // `--verbose` and `-v`
-                    return self::VERBOSITY_VERBOSE;
-                case '2':
-                case 'v': // `-vv`
-                    return self::VERBOSITY_VERY_VERBOSE;
-                case '3':
-                case 'vv': // `-vvv`
-                    return self::VERBOSITY_DEBUG;
-                default: // implicitly normal, config file default wins
-                    return;
-            }
-        }
-
-        // quiet and normal have to come before verbose, because it eats everything else.
-        if ($input->hasParameterOption('--verbose=-1', true) || $input->getParameterOption('--verbose', false, true) === '-1') {
-            return self::VERBOSITY_QUIET;
-        }
-
-        if ($input->hasParameterOption('--verbose=0', true) || $input->getParameterOption('--verbose', false, true) === '0') {
-            return self::VERBOSITY_NORMAL;
-        }
-
-        // `-vvv`, `-vv` and `-v` have to come in descending length order, because `hasParameterOption` matches prefixes.
-        if ($input->hasParameterOption('-vvv', true) || $input->hasParameterOption('--verbose=3', true) || $input->getParameterOption('--verbose', false, true) === '3') {
-            return self::VERBOSITY_DEBUG;
-        }
-
-        if ($input->hasParameterOption('-vv', true) || $input->hasParameterOption('--verbose=2', true) || $input->getParameterOption('--verbose', false, true) === '2') {
-            return self::VERBOSITY_VERY_VERBOSE;
-        }
-
-        if ($input->hasParameterOption('-v', true) || $input->hasParameterOption('--verbose=1', true) || $input->hasParameterOption('--verbose', true)) {
-            return self::VERBOSITY_VERBOSE;
-        }
-    }
-
-    /**
-     * Get a list of input options expected when initializing Configuration via input.
-     *
-     * @see self::fromInput
-     *
-     * @return InputOption[]
-     */
-    public static function getInputOptions(): array
-    {
-        return [
-            new InputOption('config', 'c', InputOption::VALUE_REQUIRED, 'Use an alternate PsySH config file location.'),
-            new InputOption('cwd', null, InputOption::VALUE_REQUIRED, 'Use an alternate working directory.'),
-
-            new InputOption('color', null, InputOption::VALUE_NONE, 'Force colors in output.'),
-            new InputOption('no-color', null, InputOption::VALUE_NONE, 'Disable colors in output.'),
-            // --ansi and --no-ansi aliases to match Symfony, Composer, etc.
-            new InputOption('ansi', null, InputOption::VALUE_NONE, 'Force colors in output.'),
-            new InputOption('no-ansi', null, InputOption::VALUE_NONE, 'Disable colors in output.'),
-
-            new InputOption('quiet', 'q', InputOption::VALUE_NONE, 'Shhhhhh.'),
-            new InputOption('verbose', 'v|vv|vvv', InputOption::VALUE_OPTIONAL, 'Increase the verbosity of messages.', '0'),
-            new InputOption('compact', null, InputOption::VALUE_NONE, 'Run PsySH with compact output.'),
-            new InputOption('interactive', 'i|a', InputOption::VALUE_NONE, 'Force PsySH to run in interactive mode.'),
-            new InputOption('no-interactive', 'n', InputOption::VALUE_NONE, 'Run PsySH without interactive input. Requires input from stdin.'),
-            // --interaction and --no-interaction aliases for compatibility with Symfony, Composer, etc
-            new InputOption('interaction', null, InputOption::VALUE_NONE, 'Force PsySH to run in interactive mode.'),
-            new InputOption('no-interaction', null, InputOption::VALUE_NONE, 'Run PsySH without interactive input. Requires input from stdin.'),
-            new InputOption('raw-output', 'r', InputOption::VALUE_NONE, 'Print var_export-style return values (for non-interactive input)'),
-
-            new InputOption('self-update', 'u', InputOption::VALUE_NONE, 'Update to the latest version'),
-
-            new InputOption('yolo', null, InputOption::VALUE_NONE, 'Run PsySH with minimal input validation. You probably don\'t want this.'),
-        ];
     }
 
     /**
@@ -388,7 +146,7 @@ class Configuration
     {
         // feature detection
         $this->hasReadline = \function_exists('readline');
-        $this->hasPcntl = ProcessForker::isSupported();
+        $this->hasPcntl    = \function_exists('pcntl_signal') && \function_exists('posix_getpid');
 
         if ($configFile = $this->getConfigFile()) {
             $this->loadConfigFile($configFile);
@@ -397,12 +155,6 @@ class Configuration
         if (!$this->configFile && $localConfig = $this->getLocalConfigFile()) {
             $this->loadConfigFile($localConfig);
         }
-
-        $this->configPaths->overrideDirs([
-            'configDir'  => $this->configDir,
-            'dataDir'    => $this->dataDir,
-            'runtimeDir' => $this->runtimeDir,
-        ]);
     }
 
     /**
@@ -417,7 +169,7 @@ class Configuration
      *
      *     ~/.config/psysh/config.php
      *
-     * @return string|null
+     * @return string
      */
     public function getConfigFile()
     {
@@ -425,12 +177,12 @@ class Configuration
             return $this->configFile;
         }
 
-        $files = $this->configPaths->configFiles(['config.php', 'rc.php']);
+        $files = ConfigPaths::getConfigFiles(['config.php', 'rc.php'], $this->configDir);
 
         if (!empty($files)) {
             if ($this->warnOnMultipleConfigs && \count($files) > 1) {
-                $msg = \sprintf('Multiple configuration files found: %s. Using %s', \implode(', ', $files), $files[0]);
-                \trigger_error($msg, \E_USER_NOTICE);
+                $msg = \sprintf('Multiple configuration files found: %s. Using %s', \implode($files, ', '), $files[0]);
+                \trigger_error($msg, E_USER_NOTICE);
             }
 
             return $files[0];
@@ -443,11 +195,11 @@ class Configuration
      * Searches for a project specific config file `.psysh.php` in the current
      * working directory.
      *
-     * @return string|null
+     * @return string
      */
     public function getLocalConfigFile()
     {
-        $localConfig = \getcwd().'/.psysh.php';
+        $localConfig = \getcwd() . '/.psysh.php';
 
         if (@\is_file($localConfig)) {
             return $localConfig;
@@ -463,7 +215,7 @@ class Configuration
     {
         foreach (self::$AVAILABLE_OPTIONS as $option) {
             if (isset($options[$option])) {
-                $method = 'set'.\ucfirst($option);
+                $method = 'set' . \ucfirst($option);
                 $this->$method($options[$option]);
             }
         }
@@ -471,14 +223,14 @@ class Configuration
         // legacy `tabCompletion` option
         if (isset($options['tabCompletion'])) {
             $msg = '`tabCompletion` is deprecated; use `useTabCompletion` instead.';
-            @\trigger_error($msg, \E_USER_DEPRECATED);
+            @\trigger_error($msg, E_USER_DEPRECATED);
 
             $this->setUseTabCompletion($options['tabCompletion']);
         }
 
         foreach (['commands', 'matchers', 'casters'] as $option) {
             if (isset($options[$option])) {
-                $method = 'add'.\ucfirst($option);
+                $method = 'add' . \ucfirst($option);
                 $this->$method($options[$option]);
             }
         }
@@ -486,7 +238,7 @@ class Configuration
         // legacy `tabCompletionMatchers` option
         if (isset($options['tabCompletionMatchers'])) {
             $msg = '`tabCompletionMatchers` is deprecated; use `matchers` instead.';
-            @\trigger_error($msg, \E_USER_DEPRECATED);
+            @\trigger_error($msg, E_USER_DEPRECATED);
 
             $this->addMatchers($options['tabCompletionMatchers']);
         }
@@ -499,16 +251,12 @@ class Configuration
      * The config file may directly manipulate the configuration, or may return
      * an array of options which will be merged with the current configuration.
      *
-     * @throws \InvalidArgumentException if the config file does not exist or returns a non-array result
+     * @throws \InvalidArgumentException if the config file returns a non-array result
      *
      * @param string $file
      */
-    public function loadConfigFile(string $file)
+    public function loadConfigFile($file)
     {
-        if (!\is_file($file)) {
-            throw new \InvalidArgumentException(\sprintf('Invalid configuration file specified, %s does not exist', $file));
-        }
-
         $__psysh_config_file__ = $file;
         $load = function ($config) use ($__psysh_config_file__) {
             $result = require $__psysh_config_file__;
@@ -540,9 +288,9 @@ class Configuration
     /**
      * Get files to be included by default at the start of each shell session.
      *
-     * @return string[]
+     * @return array
      */
-    public function getDefaultIncludes(): array
+    public function getDefaultIncludes()
     {
         return $this->defaultIncludes ?: [];
     }
@@ -552,21 +300,15 @@ class Configuration
      *
      * @param string $dir
      */
-    public function setConfigDir(string $dir)
+    public function setConfigDir($dir)
     {
         $this->configDir = (string) $dir;
-
-        $this->configPaths->overrideDirs([
-            'configDir'  => $this->configDir,
-            'dataDir'    => $this->dataDir,
-            'runtimeDir' => $this->runtimeDir,
-        ]);
     }
 
     /**
      * Get the current configuration directory, if any is explicitly set.
      *
-     * @return string|null
+     * @return string
      */
     public function getConfigDir()
     {
@@ -578,21 +320,15 @@ class Configuration
      *
      * @param string $dir
      */
-    public function setDataDir(string $dir)
+    public function setDataDir($dir)
     {
         $this->dataDir = (string) $dir;
-
-        $this->configPaths->overrideDirs([
-            'configDir'  => $this->configDir,
-            'dataDir'    => $this->dataDir,
-            'runtimeDir' => $this->runtimeDir,
-        ]);
     }
 
     /**
      * Get the current data directory, if any is explicitly set.
      *
-     * @return string|null
+     * @return string
      */
     public function getDataDir()
     {
@@ -604,15 +340,9 @@ class Configuration
      *
      * @param string $dir
      */
-    public function setRuntimeDir(string $dir)
+    public function setRuntimeDir($dir)
     {
         $this->runtimeDir = (string) $dir;
-
-        $this->configPaths->overrideDirs([
-            'configDir'  => $this->configDir,
-            'dataDir'    => $this->dataDir,
-            'runtimeDir' => $this->runtimeDir,
-        ]);
     }
 
     /**
@@ -621,19 +351,19 @@ class Configuration
      * Defaults to  `/psysh` inside the system's temp dir unless explicitly
      * overridden.
      *
-     * @throws RuntimeException if no temporary directory is set and it is not possible to create one
+     * @return string
      */
-    public function getRuntimeDir(): string
+    public function getRuntimeDir()
     {
-        $runtimeDir = $this->configPaths->runtimeDir();
-
-        if (!\is_dir($runtimeDir)) {
-            if (!@\mkdir($runtimeDir, 0700, true)) {
-                throw new RuntimeException(\sprintf('Unable to create PsySH runtime directory. Make sure PHP is able to write to %s in order to continue.', \dirname($runtimeDir)));
-            }
+        if (!isset($this->runtimeDir)) {
+            $this->runtimeDir = ConfigPaths::getRuntimeDir();
         }
 
-        return $runtimeDir;
+        if (!\is_dir($this->runtimeDir)) {
+            \mkdir($this->runtimeDir, 0700, true);
+        }
+
+        return $this->runtimeDir;
     }
 
     /**
@@ -641,7 +371,7 @@ class Configuration
      *
      * @param string $file
      */
-    public function setHistoryFile(string $file)
+    public function setHistoryFile($file)
     {
         $this->historyFile = ConfigPaths::touchFileWithMkdir($file);
     }
@@ -651,25 +381,28 @@ class Configuration
      *
      * Defaults to `/history` inside the shell's base config dir unless
      * explicitly overridden.
+     *
+     * @return string
      */
-    public function getHistoryFile(): string
+    public function getHistoryFile()
     {
         if (isset($this->historyFile)) {
             return $this->historyFile;
         }
 
-        $files = $this->configPaths->configFiles(['psysh_history', 'history']);
+        $files = ConfigPaths::getConfigFiles(['psysh_history', 'history'], $this->configDir);
 
         if (!empty($files)) {
             if ($this->warnOnMultipleConfigs && \count($files) > 1) {
-                $msg = \sprintf('Multiple history files found: %s. Using %s', \implode(', ', $files), $files[0]);
-                \trigger_error($msg, \E_USER_NOTICE);
+                $msg = \sprintf('Multiple history files found: %s. Using %s', \implode($files, ', '), $files[0]);
+                \trigger_error($msg, E_USER_NOTICE);
             }
 
             $this->setHistoryFile($files[0]);
         } else {
             // fallback: create our own history file
-            $this->setHistoryFile($this->configPaths->currentConfigDir().'/psysh_history');
+            $dir = $this->configDir ?: ConfigPaths::getCurrentConfigDir();
+            $this->setHistoryFile($dir . '/psysh_history');
         }
 
         return $this->historyFile;
@@ -680,7 +413,7 @@ class Configuration
      *
      * @param int $value
      */
-    public function setHistorySize(int $value)
+    public function setHistorySize($value)
     {
         $this->historySize = (int) $value;
     }
@@ -700,7 +433,7 @@ class Configuration
      *
      * @param bool $value
      */
-    public function setEraseDuplicates(bool $value)
+    public function setEraseDuplicates($value)
     {
         $this->eraseDuplicates = (bool) $value;
     }
@@ -708,7 +441,7 @@ class Configuration
     /**
      * Get whether readline erases old duplicate history entries.
      *
-     * @return bool|null
+     * @return bool
      */
     public function getEraseDuplicates()
     {
@@ -727,9 +460,9 @@ class Configuration
      *
      * @return string Temporary file name
      */
-    public function getTempFile(string $type, int $pid): string
+    public function getTempFile($type, $pid)
     {
-        return \tempnam($this->getRuntimeDir(), $type.'_'.$pid.'_');
+        return \tempnam($this->getRuntimeDir(), $type . '_' . $pid . '_');
     }
 
     /**
@@ -742,7 +475,7 @@ class Configuration
      *
      * @return string Pipe name
      */
-    public function getPipe(string $type, int $pid): string
+    public function getPipe($type, $pid)
     {
         return \sprintf('%s/%s_%s', $this->getRuntimeDir(), $type, $pid);
     }
@@ -752,7 +485,7 @@ class Configuration
      *
      * @return bool True if Readline is available
      */
-    public function hasReadline(): bool
+    public function hasReadline()
     {
         return $this->hasReadline;
     }
@@ -762,7 +495,7 @@ class Configuration
      *
      * @param bool $useReadline
      */
-    public function setUseReadline(bool $useReadline)
+    public function setUseReadline($useReadline)
     {
         $this->useReadline = (bool) $useReadline;
     }
@@ -775,7 +508,7 @@ class Configuration
      *
      * @return bool True if the current Shell should use Readline
      */
-    public function useReadline(): bool
+    public function useReadline()
     {
         return isset($this->useReadline) ? ($this->hasReadline && $this->useReadline) : $this->hasReadline;
     }
@@ -783,9 +516,9 @@ class Configuration
     /**
      * Set the Psy Shell readline service.
      *
-     * @param Readline\Readline $readline
+     * @param Readline $readline
      */
-    public function setReadline(Readline\Readline $readline)
+    public function setReadline(Readline $readline)
     {
         $this->readline = $readline;
     }
@@ -799,9 +532,9 @@ class Configuration
      *  * Libedit
      *  * A transient array-based readline emulation.
      *
-     * @return Readline\Readline
+     * @return Readline
      */
-    public function getReadline(): Readline\Readline
+    public function getReadline()
     {
         if (!isset($this->readline)) {
             $className = $this->getReadlineClass();
@@ -819,22 +552,22 @@ class Configuration
      * Get the appropriate Readline implementation class name.
      *
      * @see self::getReadline
+     *
+     * @return string
      */
-    private function getReadlineClass(): string
+    private function getReadlineClass()
     {
         if ($this->useReadline()) {
-            if (Readline\GNUReadline::isSupported()) {
-                return Readline\GNUReadline::class;
-            } elseif (Readline\Libedit::isSupported()) {
-                return Readline\Libedit::class;
+            if (GNUReadline::isSupported()) {
+                return 'Psy\Readline\GNUReadline';
+            } elseif (Libedit::isSupported()) {
+                return 'Psy\Readline\Libedit';
+            } elseif (HoaConsole::isSupported()) {
+                return 'Psy\Readline\HoaConsole';
             }
         }
 
-        if (Readline\Userland::isSupported()) {
-            return Readline\Userland::class;
-        }
-
-        return Readline\Transient::class;
+        return 'Psy\Readline\Transient';
     }
 
     /**
@@ -844,7 +577,7 @@ class Configuration
      *
      * @param bool $useBracketedPaste
      */
-    public function setUseBracketedPaste(bool $useBracketedPaste)
+    public function setUseBracketedPaste($useBracketedPaste)
     {
         $this->useBracketedPaste = (bool) $useBracketedPaste;
     }
@@ -864,14 +597,15 @@ class Configuration
      *
      * @return bool True if the shell should use bracketed paste
      */
-    public function useBracketedPaste(): bool
+    public function useBracketedPaste()
     {
-        $readlineClass = $this->getReadlineClass();
+        // For now, only the GNU readline implementation supports bracketed paste.
+        $supported = ($this->getReadlineClass() === 'Psy\Readline\GNUReadline');
 
-        return $this->useBracketedPaste && $readlineClass::supportsBracketedPaste();
+        return $supported && $this->useBracketedPaste;
 
         // @todo mebbe turn this on by default some day?
-        // return $readlineClass::supportsBracketedPaste() && $this->useBracketedPaste !== false;
+        // return isset($this->useBracketedPaste) ? ($supported && $this->useBracketedPaste) : $supported;
     }
 
     /**
@@ -879,7 +613,7 @@ class Configuration
      *
      * @return bool True if Pcntl is available
      */
-    public function hasPcntl(): bool
+    public function hasPcntl()
     {
         return $this->hasPcntl;
     }
@@ -889,7 +623,7 @@ class Configuration
      *
      * @param bool $usePcntl
      */
-    public function setUsePcntl(bool $usePcntl)
+    public function setUsePcntl($usePcntl)
     {
         $this->usePcntl = (bool) $usePcntl;
     }
@@ -902,42 +636,9 @@ class Configuration
      *
      * @return bool True if the current Shell should use Pcntl
      */
-    public function usePcntl(): bool
+    public function usePcntl()
     {
-        if (!isset($this->usePcntl)) {
-            // Unless pcntl is explicitly *enabled*, don't use it while XDebug is debugging.
-            // See https://github.com/bobthecow/psysh/issues/742
-            if (\function_exists('xdebug_is_debugger_active') && \xdebug_is_debugger_active()) {
-                return false;
-            }
-
-            return $this->hasPcntl;
-        }
-
-        return $this->hasPcntl && $this->usePcntl;
-    }
-
-    /**
-     * Check whether to use raw output.
-     *
-     * This is set by the --raw-output (-r) flag, and really only makes sense
-     * when non-interactive, e.g. executing stdin.
-     *
-     * @return bool true if raw output is enabled
-     */
-    public function rawOutput(): bool
-    {
-        return $this->rawOutput;
-    }
-
-    /**
-     * Enable or disable raw output.
-     *
-     * @param bool $rawOutput
-     */
-    public function setRawOutput(bool $rawOutput)
-    {
-        $this->rawOutput = (bool) $rawOutput;
+        return isset($this->usePcntl) ? ($this->hasPcntl && $this->usePcntl) : $this->hasPcntl;
     }
 
     /**
@@ -947,7 +648,7 @@ class Configuration
      *
      * @param bool $requireSemicolons
      */
-    public function setRequireSemicolons(bool $requireSemicolons)
+    public function setRequireSemicolons($requireSemicolons)
     {
         $this->requireSemicolons = (bool) $requireSemicolons;
     }
@@ -958,26 +659,12 @@ class Configuration
      * By default, PsySH will automatically insert semicolons at the end of
      * statements if they're missing. To strictly require semicolons, set
      * `requireSemicolons` to true.
+     *
+     * @return bool
      */
-    public function requireSemicolons(): bool
+    public function requireSemicolons()
     {
         return $this->requireSemicolons;
-    }
-
-    /**
-     * Enable or disable strict types enforcement.
-     */
-    public function setStrictTypes($strictTypes)
-    {
-        $this->strictTypes = (bool) $strictTypes;
-    }
-
-    /**
-     * Check whether to enforce strict types.
-     */
-    public function strictTypes(): bool
-    {
-        return $this->strictTypes;
     }
 
     /**
@@ -988,7 +675,7 @@ class Configuration
      *
      * @param bool $useUnicode
      */
-    public function setUseUnicode(bool $useUnicode)
+    public function setUseUnicode($useUnicode)
     {
         $this->useUnicode = (bool) $useUnicode;
     }
@@ -998,8 +685,10 @@ class Configuration
      *
      * Note that this does not disable Unicode output in general, it just makes
      * it so PsySH won't output any itself.
+     *
+     * @return bool
      */
-    public function useUnicode(): bool
+    public function useUnicode()
     {
         if (isset($this->useUnicode)) {
             return $this->useUnicode;
@@ -1014,26 +703,29 @@ class Configuration
      *
      * @see self::errorLoggingLevel
      *
-     * @param int $errorLoggingLevel
+     * @param bool $errorLoggingLevel
      */
     public function setErrorLoggingLevel($errorLoggingLevel)
     {
-        $this->errorLoggingLevel = (\E_ALL | \E_STRICT) & $errorLoggingLevel;
+        $this->errorLoggingLevel = (E_ALL | E_STRICT) & $errorLoggingLevel;
     }
 
     /**
      * Get the current error logging level.
      *
      * By default, PsySH will automatically log all errors, regardless of the
-     * current `error_reporting` level.
+     * current `error_reporting` level. Additionally, if the `error_reporting`
+     * level warrants, an ErrorException will be thrown.
      *
      * Set `errorLoggingLevel` to 0 to prevent logging non-thrown errors. Set it
      * to any valid error_reporting value to log only errors which match that
      * level.
      *
      *     http://php.net/manual/en/function.error-reporting.php
+     *
+     * @return int
      */
-    public function errorLoggingLevel(): int
+    public function errorLoggingLevel()
     {
         return $this->errorLoggingLevel;
     }
@@ -1052,32 +744,16 @@ class Configuration
      * Get a CodeCleaner service instance.
      *
      * If none has been explicitly defined, this will create a new instance.
+     *
+     * @return CodeCleaner
      */
-    public function getCodeCleaner(): CodeCleaner
+    public function getCodeCleaner()
     {
         if (!isset($this->cleaner)) {
-            $this->cleaner = new CodeCleaner(null, null, null, $this->yolo(), $this->strictTypes());
+            $this->cleaner = new CodeCleaner();
         }
 
         return $this->cleaner;
-    }
-
-    /**
-     * Enable or disable running PsySH without input validation.
-     *
-     * You don't want this.
-     */
-    public function setYolo($yolo)
-    {
-        $this->yolo = (bool) $yolo;
-    }
-
-    /**
-     * Check whether to disable input validation.
-     */
-    public function yolo(): bool
-    {
-        return $this->yolo;
     }
 
     /**
@@ -1085,7 +761,7 @@ class Configuration
      *
      * @param bool $useTabCompletion
      */
-    public function setUseTabCompletion(bool $useTabCompletion)
+    public function setUseTabCompletion($useTabCompletion)
     {
         $this->useTabCompletion = (bool) $useTabCompletion;
     }
@@ -1095,7 +771,7 @@ class Configuration
      *
      * @param bool $useTabCompletion
      */
-    public function setTabCompletion(bool $useTabCompletion)
+    public function setTabCompletion($useTabCompletion)
     {
         $this->setUseTabCompletion($useTabCompletion);
     }
@@ -1108,15 +784,17 @@ class Configuration
      *
      * @return bool True if the current Shell should use tab completion
      */
-    public function useTabCompletion(): bool
+    public function useTabCompletion()
     {
         return isset($this->useTabCompletion) ? ($this->hasReadline && $this->useTabCompletion) : $this->hasReadline;
     }
 
     /**
      * @deprecated Call `useTabCompletion` instead
+     *
+     * @return bool
      */
-    public function getTabCompletion(): bool
+    public function getTabCompletion()
     {
         return $this->useTabCompletion();
     }
@@ -1129,42 +807,27 @@ class Configuration
     public function setOutput(ShellOutput $output)
     {
         $this->output = $output;
-        $this->pipedOutput = null; // Reset cached pipe info
-
-        if (isset($this->theme)) {
-            $output->setTheme($this->theme);
-        }
-
-        $this->applyFormatterStyles();
     }
 
     /**
      * Get a Shell Output service instance.
      *
      * If none has been explicitly provided, this will create a new instance
-     * with the configured verbosity and output pager supplied by self::getPager
+     * with VERBOSITY_NORMAL and the output page supplied by self::getPager
      *
-     * @see self::verbosity
      * @see self::getPager
+     *
+     * @return ShellOutput
      */
-    public function getOutput(): ShellOutput
+    public function getOutput()
     {
         if (!isset($this->output)) {
-            $this->setOutput(new ShellOutput(
-                $this->getOutputVerbosity(),
+            $this->output = new ShellOutput(
+                OutputInterface::VERBOSITY_NORMAL,
+                $this->getOutputDecorated(),
                 null,
-                null,
-                $this->getPager() ?: null,
-                $this->theme()
-            ));
-
-            // This is racy because `getOutputDecorated` needs access to the
-            // output stream to figure out if it's piped or not, so create it
-            // first, then update after we have a stream.
-            $decorated = $this->getOutputDecorated();
-            if ($decorated !== null) {
-                $this->output->setDecorated($decorated);
-            }
+                $this->getPager()
+            );
         }
 
         return $this->output;
@@ -1173,34 +836,16 @@ class Configuration
     /**
      * Get the decoration (i.e. color) setting for the Shell Output service.
      *
-     * @return bool|null 3-state boolean corresponding to the current color mode
+     * @return null|bool 3-state boolean corresponding to the current color mode
      */
     public function getOutputDecorated()
     {
-        switch ($this->colorMode()) {
-            case self::COLOR_MODE_FORCED:
-                return true;
-            case self::COLOR_MODE_DISABLED:
-                return false;
-            case self::COLOR_MODE_AUTO:
-            default:
-                return $this->outputIsPiped() ? false : null;
-        }
-    }
-
-    /**
-     * Get the interactive setting for shell input.
-     */
-    public function getInputInteractive(): bool
-    {
-        switch ($this->interactiveMode()) {
-            case self::INTERACTIVE_MODE_FORCED:
-                return true;
-            case self::INTERACTIVE_MODE_DISABLED:
-                return false;
-            case self::INTERACTIVE_MODE_AUTO:
-            default:
-                return !$this->inputIsPiped();
+        if ($this->colorMode() === self::COLOR_MODE_AUTO) {
+            return;
+        } elseif ($this->colorMode() === self::COLOR_MODE_FORCED) {
+            return true;
+        } elseif ($this->colorMode() === self::COLOR_MODE_DISABLED) {
+            return false;
         }
     }
 
@@ -1210,19 +855,13 @@ class Configuration
      * If a string is supplied, a ProcOutputPager will be used which shells out
      * to the specified command.
      *
-     * `cat` is special-cased to use the PassthruPager directly.
-     *
      * @throws \InvalidArgumentException if $pager is not a string or OutputPager instance
      *
-     * @param string|OutputPager|false $pager
+     * @param string|OutputPager $pager
      */
     public function setPager($pager)
     {
-        if ($pager === null || $pager === false || $pager === 'cat') {
-            $pager = false;
-        }
-
-        if ($pager !== false && !\is_string($pager) && !$pager instanceof OutputPager) {
+        if ($pager && !\is_string($pager) && !$pager instanceof OutputPager) {
             throw new \InvalidArgumentException('Unexpected pager instance');
         }
 
@@ -1235,21 +874,17 @@ class Configuration
      * If no Pager has been explicitly provided, and Pcntl is available, this
      * will default to `cli.pager` ini value, falling back to `which less`.
      *
-     * @return string|OutputPager|false
+     * @return string|OutputPager
      */
     public function getPager()
     {
         if (!isset($this->pager) && $this->usePcntl()) {
-            if (\getenv('TERM') === 'dumb') {
-                return false;
-            }
-
             if ($pager = \ini_get('cli.pager')) {
                 // use the default pager
                 $this->pager = $pager;
-            } elseif ($less = $this->configPaths->which('less')) {
+            } elseif ($less = \exec('which less 2>/dev/null')) {
                 // check for the presence of less...
-                $this->pager = $less.' -R -F -X';
+                $this->pager = $less . ' -R -S -F -X';
             }
         }
 
@@ -1268,8 +903,10 @@ class Configuration
 
     /**
      * Get an AutoCompleter service instance.
+     *
+     * @return AutoCompleter
      */
-    public function getAutoCompleter(): AutoCompleter
+    public function getAutoCompleter()
     {
         if (!isset($this->autoCompleter)) {
             $this->autoCompleter = new AutoCompleter();
@@ -1280,8 +917,10 @@ class Configuration
 
     /**
      * @deprecated Nothing should be using this anymore
+     *
+     * @return array
      */
-    public function getTabCompletionMatchers(): array
+    public function getTabCompletionMatchers()
     {
         return [];
     }
@@ -1376,7 +1015,7 @@ class Configuration
      *
      * @param string $filename
      */
-    public function setManualDbFile(string $filename)
+    public function setManualDbFile($filename)
     {
         $this->manualDbFile = (string) $filename;
     }
@@ -1384,7 +1023,7 @@ class Configuration
     /**
      * Get the current PHP manual database file.
      *
-     * @return string|null Default: '~/.local/share/psysh/php_manual.sqlite'
+     * @return string Default: '~/.local/share/psysh/php_manual.sqlite'
      */
     public function getManualDbFile()
     {
@@ -1392,11 +1031,11 @@ class Configuration
             return $this->manualDbFile;
         }
 
-        $files = $this->configPaths->dataFiles(['php_manual.sqlite']);
+        $files = ConfigPaths::getDataFiles(['php_manual.sqlite'], $this->dataDir);
         if (!empty($files)) {
             if ($this->warnOnMultipleConfigs && \count($files) > 1) {
-                $msg = \sprintf('Multiple manual database files found: %s. Using %s', \implode(', ', $files), $files[0]);
-                \trigger_error($msg, \E_USER_NOTICE);
+                $msg = \sprintf('Multiple manual database files found: %s. Using %s', \implode($files, ', '), $files[0]);
+                \trigger_error($msg, E_USER_NOTICE);
             }
 
             return $this->manualDbFile = $files[0];
@@ -1406,15 +1045,15 @@ class Configuration
     /**
      * Get a PHP manual database connection.
      *
-     * @return \PDO|null
+     * @return \PDO
      */
     public function getManualDb()
     {
         if (!isset($this->manualDb)) {
             $dbFile = $this->getManualDbFile();
-            if ($dbFile !== null && \is_file($dbFile)) {
+            if (\is_file($dbFile)) {
                 try {
-                    $this->manualDb = new \PDO('sqlite:'.$dbFile);
+                    $this->manualDb = new \PDO('sqlite:' . $dbFile);
                 } catch (\PDOException $e) {
                     if ($e->getMessage() === 'could not find driver') {
                         throw new RuntimeException('SQLite PDO driver not found', 0, $e);
@@ -1440,8 +1079,10 @@ class Configuration
 
     /**
      * Get the Presenter service.
+     *
+     * @return Presenter
      */
-    public function getPresenter(): Presenter
+    public function getPresenter()
     {
         if (!isset($this->presenter)) {
             $this->presenter = new Presenter($this->getOutput()->getFormatter(), $this->forceArrayIndexes());
@@ -1457,7 +1098,7 @@ class Configuration
      *
      * @param bool $warnOnMultipleConfigs
      */
-    public function setWarnOnMultipleConfigs(bool $warnOnMultipleConfigs)
+    public function setWarnOnMultipleConfigs($warnOnMultipleConfigs)
     {
         $this->warnOnMultipleConfigs = (bool) $warnOnMultipleConfigs;
     }
@@ -1471,8 +1112,10 @@ class Configuration
      * are found.
      *
      * This will default to true in a future release, but is false for now.
+     *
+     * @return bool
      */
-    public function warnOnMultipleConfigs(): bool
+    public function warnOnMultipleConfigs()
     {
         return $this->warnOnMultipleConfigs;
     }
@@ -1480,11 +1123,9 @@ class Configuration
     /**
      * Set the current color mode.
      *
-     * @throws \InvalidArgumentException if the color mode isn't auto, forced or disabled
-     *
      * @param string $colorMode
      */
-    public function setColorMode(string $colorMode)
+    public function setColorMode($colorMode)
     {
         $validColorModes = [
             self::COLOR_MODE_AUTO,
@@ -1492,49 +1133,21 @@ class Configuration
             self::COLOR_MODE_DISABLED,
         ];
 
-        if (!\in_array($colorMode, $validColorModes)) {
-            throw new \InvalidArgumentException('Invalid color mode: '.$colorMode);
+        if (\in_array($colorMode, $validColorModes)) {
+            $this->colorMode = $colorMode;
+        } else {
+            throw new \InvalidArgumentException('invalid color mode: ' . $colorMode);
         }
-
-        $this->colorMode = $colorMode;
     }
 
     /**
      * Get the current color mode.
+     *
+     * @return string
      */
-    public function colorMode(): string
+    public function colorMode()
     {
         return $this->colorMode;
-    }
-
-    /**
-     * Set the shell's interactive mode.
-     *
-     * @throws \InvalidArgumentException if interactive mode isn't disabled, forced, or auto
-     *
-     * @param string $interactiveMode
-     */
-    public function setInteractiveMode(string $interactiveMode)
-    {
-        $validInteractiveModes = [
-            self::INTERACTIVE_MODE_AUTO,
-            self::INTERACTIVE_MODE_FORCED,
-            self::INTERACTIVE_MODE_DISABLED,
-        ];
-
-        if (!\in_array($interactiveMode, $validInteractiveModes)) {
-            throw new \InvalidArgumentException('Invalid interactive mode: '.$interactiveMode);
-        }
-
-        $this->interactiveMode = $interactiveMode;
-    }
-
-    /**
-     * Get the current interactive mode.
-     */
-    public function interactiveMode(): string
-    {
-        return $this->interactiveMode;
     }
 
     /**
@@ -1551,8 +1164,10 @@ class Configuration
      * Get an update checker service instance.
      *
      * If none has been explicitly defined, this will create a new instance.
+     *
+     * @return Checker
      */
-    public function getChecker(): Checker
+    public function getChecker()
     {
         if (!isset($this->checker)) {
             $interval = $this->getUpdateCheck();
@@ -1586,8 +1201,10 @@ class Configuration
      *
      * One of 'always', 'daily', 'weekly', 'monthly' or 'never'. If none is
      * explicitly set, default to 'weekly'.
+     *
+     * @return string
      */
-    public function getUpdateCheck(): string
+    public function getUpdateCheck()
     {
         return isset($this->updateCheck) ? $this->updateCheck : Checker::WEEKLY;
     }
@@ -1595,11 +1212,11 @@ class Configuration
     /**
      * Set the update check interval.
      *
-     * @throws \InvalidArgumentException if the update check interval is unknown
+     * @throws \InvalidArgumentDescription if the update check interval is unknown
      *
      * @param string $interval
      */
-    public function setUpdateCheck(string $interval)
+    public function setUpdateCheck($interval)
     {
         $validIntervals = [
             Checker::ALWAYS,
@@ -1610,7 +1227,7 @@ class Configuration
         ];
 
         if (!\in_array($interval, $validIntervals)) {
-            throw new \InvalidArgumentException('Invalid update check interval: '.$interval);
+            throw new \InvalidArgumentException('invalid update check interval: ' . $interval);
         }
 
         $this->updateCheck = $interval;
@@ -1623,7 +1240,9 @@ class Configuration
      */
     public function getUpdateCheckCacheFile()
     {
-        return ConfigPaths::touchFileWithMkdir($this->configPaths->currentConfigDir().'/update_check.json');
+        $dir = $this->configDir ?: ConfigPaths::getCurrentConfigDir();
+
+        return ConfigPaths::touchFileWithMkdir($dir . '/update_check.json');
     }
 
     /**
@@ -1631,7 +1250,7 @@ class Configuration
      *
      * @param string $message
      */
-    public function setStartupMessage(string $message)
+    public function setStartupMessage($message)
     {
         $this->startupMessage = $message;
     }
@@ -1649,25 +1268,17 @@ class Configuration
     /**
      * Set the prompt.
      *
-     * @deprecated The `prompt` configuration has been replaced by Themes and support will
-     * eventually be removed. In the meantime, prompt is applied first by the Theme, then overridden
-     * by any explicitly defined prompt.
-     *
-     * Note that providing a prompt but not a theme config will implicitly use the `classic` theme.
+     * @param string $prompt
      */
-    public function setPrompt(string $prompt)
+    public function setPrompt($prompt)
     {
         $this->prompt = $prompt;
-
-        if (isset($this->theme)) {
-            $this->theme->setPrompt($prompt);
-        }
     }
 
     /**
      * Get the prompt.
      *
-     * @return string|null
+     * @return string
      */
     public function getPrompt()
     {
@@ -1676,8 +1287,10 @@ class Configuration
 
     /**
      * Get the force array indexes.
+     *
+     * @return bool
      */
-    public function forceArrayIndexes(): bool
+    public function forceArrayIndexes()
     {
         return $this->forceArrayIndexes;
     }
@@ -1687,205 +1300,8 @@ class Configuration
      *
      * @param bool $forceArrayIndexes
      */
-    public function setForceArrayIndexes(bool $forceArrayIndexes)
+    public function setForceArrayIndexes($forceArrayIndexes)
     {
         $this->forceArrayIndexes = $forceArrayIndexes;
-    }
-
-    /**
-     * Set the current output Theme.
-     *
-     * @param Theme|string|array $theme Theme (or Theme config)
-     */
-    public function setTheme($theme)
-    {
-        if (!$theme instanceof Theme) {
-            $theme = new Theme($theme);
-        }
-
-        $this->theme = $theme;
-
-        if (isset($this->prompt)) {
-            $this->theme->setPrompt($this->prompt);
-        }
-
-        if (isset($this->output)) {
-            $this->output->setTheme($theme);
-            $this->applyFormatterStyles();
-        }
-    }
-
-    /**
-     * Get the current output Theme.
-     */
-    public function theme(): Theme
-    {
-        if (!isset($this->theme)) {
-            // If a prompt is explicitly set, and a theme is not, base it on the `classic` theme.
-            $this->theme = $this->prompt ? new Theme('classic') : new Theme();
-        }
-
-        if (isset($this->prompt)) {
-            $this->theme->setPrompt($this->prompt);
-        }
-
-        return $this->theme;
-    }
-
-    /**
-     * Set the shell output formatter styles.
-     *
-     * Accepts a map from style name to [fg, bg, options], for example:
-     *
-     *     [
-     *         'error' => ['white', 'red', ['bold']],
-     *         'warning' => ['black', 'yellow'],
-     *     ]
-     *
-     * Foreground, background or options can be null, or even omitted entirely.
-     *
-     * @deprecated The `formatterStyles` configuration has been replaced by Themes and support will
-     * eventually be removed. In the meantime, styles are applied first by the Theme, then
-     * overridden by any explicitly defined formatter styles.
-     */
-    public function setFormatterStyles(array $formatterStyles)
-    {
-        foreach ($formatterStyles as $name => $style) {
-            $this->formatterStyles[$name] = new OutputFormatterStyle(...$style);
-        }
-
-        if (isset($this->output)) {
-            $this->applyFormatterStyles();
-        }
-    }
-
-    /**
-     * Internal method for applying output formatter style customization.
-     *
-     * This is called on initialization of the shell output, and again if the
-     * formatter styles config is updated.
-     *
-     * @deprecated The `formatterStyles` configuration has been replaced by Themes and support will
-     * eventually be removed. In the meantime, styles are applied first by the Theme, then
-     * overridden by any explicitly defined formatter styles.
-     */
-    private function applyFormatterStyles()
-    {
-        $formatter = $this->output->getFormatter();
-        foreach ($this->formatterStyles as $name => $style) {
-            $formatter->setStyle($name, $style);
-        }
-
-        $errorFormatter = $this->output->getErrorOutput()->getFormatter();
-        foreach (Theme::ERROR_STYLES as $name) {
-            if (isset($this->formatterStyles[$name])) {
-                $errorFormatter->setStyle($name, $this->formatterStyles[$name]);
-            }
-        }
-    }
-
-    /**
-     * Get the configured output verbosity.
-     */
-    public function verbosity(): string
-    {
-        return $this->verbosity;
-    }
-
-    /**
-     * Set the shell output verbosity.
-     *
-     * Accepts OutputInterface verbosity constants.
-     *
-     * @throws \InvalidArgumentException if verbosity level is invalid
-     *
-     * @param string $verbosity
-     */
-    public function setVerbosity(string $verbosity)
-    {
-        $validVerbosityLevels = [
-            self::VERBOSITY_QUIET,
-            self::VERBOSITY_NORMAL,
-            self::VERBOSITY_VERBOSE,
-            self::VERBOSITY_VERY_VERBOSE,
-            self::VERBOSITY_DEBUG,
-        ];
-
-        if (!\in_array($verbosity, $validVerbosityLevels)) {
-            throw new \InvalidArgumentException('Invalid verbosity level: '.$verbosity);
-        }
-
-        $this->verbosity = $verbosity;
-
-        if (isset($this->output)) {
-            $this->output->setVerbosity($this->getOutputVerbosity());
-        }
-    }
-
-    /**
-     * Map the verbosity configuration to OutputInterface verbosity constants.
-     *
-     * @return int OutputInterface verbosity level
-     */
-    public function getOutputVerbosity(): int
-    {
-        switch ($this->verbosity()) {
-            case self::VERBOSITY_QUIET:
-                return OutputInterface::VERBOSITY_QUIET;
-            case self::VERBOSITY_VERBOSE:
-                return OutputInterface::VERBOSITY_VERBOSE;
-            case self::VERBOSITY_VERY_VERBOSE:
-                return OutputInterface::VERBOSITY_VERY_VERBOSE;
-            case self::VERBOSITY_DEBUG:
-                return OutputInterface::VERBOSITY_DEBUG;
-            case self::VERBOSITY_NORMAL:
-            default:
-                return OutputInterface::VERBOSITY_NORMAL;
-        }
-    }
-
-    /**
-     * Guess whether stdin is piped.
-     *
-     * This is mostly useful for deciding whether to use non-interactive mode.
-     */
-    public function inputIsPiped(): bool
-    {
-        if ($this->pipedInput === null) {
-            $this->pipedInput = \defined('STDIN') && self::looksLikeAPipe(\STDIN);
-        }
-
-        return $this->pipedInput;
-    }
-
-    /**
-     * Guess whether shell output is piped.
-     *
-     * This is mostly useful for deciding whether to use non-decorated output.
-     */
-    public function outputIsPiped(): bool
-    {
-        if ($this->pipedOutput === null) {
-            $this->pipedOutput = self::looksLikeAPipe($this->getOutput()->getStream());
-        }
-
-        return $this->pipedOutput;
-    }
-
-    /**
-     * Guess whether an input or output stream is piped.
-     *
-     * @param resource|int $stream
-     */
-    private static function looksLikeAPipe($stream): bool
-    {
-        if (\function_exists('posix_isatty')) {
-            return !\posix_isatty($stream);
-        }
-
-        $stat = \fstat($stream);
-        $mode = $stat['mode'] & 0170000;
-
-        return $mode === 0010000 || $mode === 0040000 || $mode === 0100000 || $mode === 0120000;
     }
 }

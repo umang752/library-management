@@ -1,61 +1,24 @@
 <?php
 
-/**
- * Mockery (https://docs.mockery.io/)
- *
- * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @link      https://github.com/mockery/mockery for the canonical source repository
- */
-
 namespace Mockery\Generator;
 
-use ReflectionAttribute;
-use ReflectionClass;
-
-use function array_map;
-use function array_unique;
-
-use const PHP_VERSION_ID;
-
-class DefinedTargetClass implements TargetClassInterface
+class DefinedTargetClass
 {
     private $rfc;
-    private $name;
 
-    public function __construct(ReflectionClass $rfc, $alias = null)
+    public function __construct(\ReflectionClass $rfc)
     {
         $this->rfc = $rfc;
-        $this->name = $alias === null ? $rfc->getName() : $alias;
     }
 
-    public static function factory($name, $alias = null)
+    public static function factory($name)
     {
-        return new self(new ReflectionClass($name), $alias);
-    }
-
-    public function getAttributes()
-    {
-        if (\PHP_VERSION_ID < 80000) {
-            return [];
-        }
-
-        return array_unique(
-            array_merge(
-                ['\AllowDynamicProperties'],
-                array_map(
-                    static function (ReflectionAttribute $attribute): string {
-                        return '\\' . $attribute->getName();
-                    },
-                    $this->rfc->getAttributes()
-                )
-            )
-        );
+        return new self(new \ReflectionClass($name));
     }
 
     public function getName()
     {
-        return $this->name;
+        return $this->rfc->getName();
     }
 
     public function isAbstract()

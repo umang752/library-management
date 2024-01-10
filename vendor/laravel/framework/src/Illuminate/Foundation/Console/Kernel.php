@@ -2,36 +2,20 @@
 
 namespace Illuminate\Foundation\Console;
 
-use Carbon\CarbonInterval;
 use Closure;
-use DateTimeInterface;
-use Illuminate\Console\Application as Artisan;
-use Illuminate\Console\Command;
-use Illuminate\Console\Events\CommandFinished;
-use Illuminate\Console\Events\CommandStarting;
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Contracts\Console\Kernel as KernelContract;
-use Illuminate\Contracts\Debug\ExceptionHandler;
-use Illuminate\Contracts\Events\Dispatcher;
-use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Env;
-use Illuminate\Support\InteractsWithTime;
-use Illuminate\Support\Str;
-use ReflectionClass;
-use SplFileInfo;
-use Symfony\Component\Console\ConsoleEvents;
-use Symfony\Component\Console\Event\ConsoleCommandEvent;
-use Symfony\Component\Console\Event\ConsoleTerminateEvent;
-use Symfony\Component\EventDispatcher\EventDispatcher;
-use Symfony\Component\Finder\Finder;
+use Exception;
 use Throwable;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Events\Dispatcher;
+use Illuminate\Console\Application as Artisan;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Cache\Repository as Cache;
+use Illuminate\Contracts\Console\Kernel as KernelContract;
+use Symfony\Component\Debug\Exception\FatalThrowableError;
 
 class Kernel implements KernelContract
 {
-    use InteractsWithTime;
-
     /**
      * The application implementation.
      *
@@ -47,16 +31,9 @@ class Kernel implements KernelContract
     protected $events;
 
     /**
-     * The Symfony event dispatcher implementation.
-     *
-     * @var \Symfony\Contracts\EventDispatcher\EventDispatcherInterface|null
-     */
-    protected $symfonyDispatcher;
-
-    /**
      * The Artisan application instance.
      *
-     * @var \Illuminate\Console\Application|null
+     * @var \Illuminate\Console\Application
      */
     protected $artisan;
 
@@ -75,23 +52,9 @@ class Kernel implements KernelContract
     protected $commandsLoaded = false;
 
     /**
-     * All of the registered command duration handlers.
-     *
-     * @var array
-     */
-    protected $commandLifecycleDurationHandlers = [];
-
-    /**
-     * When the currently handled command started.
-     *
-     * @var \Illuminate\Support\Carbon|null
-     */
-    protected $commandStartedAt;
-
-    /**
      * The bootstrap classes for the application.
      *
-     * @var string[]
+     * @var array
      */
     protected $bootstrappers = [
         \Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
@@ -120,40 +83,8 @@ class Kernel implements KernelContract
         $this->events = $events;
 
         $this->app->booted(function () {
-            if (! $this->app->runningUnitTests()) {
-                $this->rerouteSymfonyCommandEvents();
-            }
-
             $this->defineConsoleSchedule();
         });
-    }
-
-    /**
-     * Re-route the Symfony command events to their Laravel counterparts.
-     *
-     * @internal
-     *
-     * @return $this
-     */
-    public function rerouteSymfonyCommandEvents()
-    {
-        if (is_null($this->symfonyDispatcher)) {
-            $this->symfonyDispatcher = new EventDispatcher;
-
-            $this->symfonyDispatcher->addListener(ConsoleEvents::COMMAND, function (ConsoleCommandEvent $event) {
-                $this->events->dispatch(
-                    new CommandStarting($event->getCommand()->getName(), $event->getInput(), $event->getOutput())
-                );
-            });
-
-            $this->symfonyDispatcher->addListener(ConsoleEvents::TERMINATE, function (ConsoleTerminateEvent $event) {
-                $this->events->dispatch(
-                    new CommandFinished($event->getCommand()->getName(), $event->getInput(), $event->getOutput(), $event->getExitCode())
-                );
-            });
-        }
-
-        return $this;
     }
 
     /**
@@ -163,43 +94,41 @@ class Kernel implements KernelContract
      */
     protected function defineConsoleSchedule()
     {
-        $this->app->singleton(Schedule::class, function ($app) {
-            return tap(new Schedule($this->scheduleTimezone()), function ($schedule) {
-                $this->schedule($schedule->useCache($this->scheduleCache()));
-            });
-        });
-    }
+        $this->app->instance(
+            Schedule::class, $schedule = new Schedule($this->app[Cache::class])
+        );
 
-    /**
-     * Get the name of the cache store that should manage scheduling mutexes.
-     *
-     * @return string
-     */
-    protected function scheduleCache()
-    {
-        return $this->app['config']->get('cache.schedule_store', Env::get('SCHEDULE_CACHE_DRIVER'));
+        $this->schedule($schedule);
     }
 
     /**
      * Run the console application.
      *
      * @param  \Symfony\Component\Console\Input\InputInterface  $input
-     * @param  \Symfony\Component\Console\Output\OutputInterface|null  $output
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $output
      * @return int
      */
     public function handle($input, $output = null)
     {
-        $this->commandStartedAt = Carbon::now();
-
         try {
-            if (in_array($input->getFirstArgument(), ['env:encrypt', 'env:decrypt'], true)) {
-                $this->bootstrapWithoutBootingProviders();
-            }
-
             $this->bootstrap();
 
+            if (! $this->commandsLoaded) {
+                $this->commands();
+
+                $this->commandsLoaded = true;
+            }
+
             return $this->getArtisan()->run($input, $output);
+        } catch (Exception $e) {
+            $this->reportException($e);
+
+            $this->renderException($output, $e);
+
+            return 1;
         } catch (Throwable $e) {
+            $e = new FatalThrowableError($e);
+
             $this->reportException($e);
 
             $this->renderException($output, $e);
@@ -218,55 +147,6 @@ class Kernel implements KernelContract
     public function terminate($input, $status)
     {
         $this->app->terminate();
-
-        if ($this->commandStartedAt === null) {
-            return;
-        }
-
-        $this->commandStartedAt->setTimezone($this->app['config']->get('app.timezone') ?? 'UTC');
-
-        foreach ($this->commandLifecycleDurationHandlers as ['threshold' => $threshold, 'handler' => $handler]) {
-            $end ??= Carbon::now();
-
-            if ($this->commandStartedAt->diffInMilliseconds($end) > $threshold) {
-                $handler($this->commandStartedAt, $input, $status);
-            }
-        }
-
-        $this->commandStartedAt = null;
-    }
-
-    /**
-     * Register a callback to be invoked when the command lifecycle duration exceeds a given amount of time.
-     *
-     * @param  \DateTimeInterface|\Carbon\CarbonInterval|float|int  $threshold
-     * @param  callable  $handler
-     * @return void
-     */
-    public function whenCommandLifecycleIsLongerThan($threshold, $handler)
-    {
-        $threshold = $threshold instanceof DateTimeInterface
-            ? $this->secondsUntil($threshold) * 1000
-            : $threshold;
-
-        $threshold = $threshold instanceof CarbonInterval
-            ? $threshold->totalMilliseconds
-            : $threshold;
-
-        $this->commandLifecycleDurationHandlers[] = [
-            'threshold' => $threshold,
-            'handler' => $handler,
-        ];
-    }
-
-    /**
-     * When the command being handled started.
-     *
-     * @return \Illuminate\Support\Carbon|null
-     */
-    public function commandStartedAt()
-    {
-        return $this->commandStartedAt;
     }
 
     /**
@@ -281,19 +161,7 @@ class Kernel implements KernelContract
     }
 
     /**
-     * Get the timezone that should be used by default for scheduled events.
-     *
-     * @return \DateTimeZone|string|null
-     */
-    protected function scheduleTimezone()
-    {
-        $config = $this->app['config'];
-
-        return $config->get('app.schedule_timezone', $config->get('app.timezone'));
-    }
-
-    /**
-     * Register the commands for the application.
+     * Register the Closure based commands for the application.
      *
      * @return void
      */
@@ -306,7 +174,7 @@ class Kernel implements KernelContract
      * Register a Closure based command with the application.
      *
      * @param  string  $signature
-     * @param  \Closure  $callback
+     * @param  Closure  $callback
      * @return \Illuminate\Foundation\Console\ClosureCommand
      */
     public function command($signature, Closure $callback)
@@ -318,54 +186,6 @@ class Kernel implements KernelContract
         });
 
         return $command;
-    }
-
-    /**
-     * Register all of the commands in the given directory.
-     *
-     * @param  array|string  $paths
-     * @return void
-     */
-    protected function load($paths)
-    {
-        $paths = array_unique(Arr::wrap($paths));
-
-        $paths = array_filter($paths, function ($path) {
-            return is_dir($path);
-        });
-
-        if (empty($paths)) {
-            return;
-        }
-
-        $namespace = $this->app->getNamespace();
-
-        foreach ((new Finder)->in($paths)->files() as $file) {
-            $command = $this->commandClassFromFile($file, $namespace);
-
-            if (is_subclass_of($command, Command::class) &&
-                ! (new ReflectionClass($command))->isAbstract()) {
-                Artisan::starting(function ($artisan) use ($command) {
-                    $artisan->resolve($command);
-                });
-            }
-        }
-    }
-
-    /**
-     * Extract the command class name from the given file path.
-     *
-     * @param  \SplFileInfo  $file
-     * @param  string  $namespace
-     * @return string
-     */
-    protected function commandClassFromFile(SplFileInfo $file, string $namespace): string
-    {
-        return $namespace.str_replace(
-            ['/', '.php'],
-            ['\\', ''],
-            Str::after($file->getRealPath(), realpath(app_path()).DIRECTORY_SEPARATOR)
-        );
     }
 
     /**
@@ -384,18 +204,18 @@ class Kernel implements KernelContract
      *
      * @param  string  $command
      * @param  array  $parameters
-     * @param  \Symfony\Component\Console\Output\OutputInterface|null  $outputBuffer
+     * @param  \Symfony\Component\Console\Output\OutputInterface  $outputBuffer
      * @return int
-     *
-     * @throws \Symfony\Component\Console\Exception\CommandNotFoundException
      */
     public function call($command, array $parameters = [], $outputBuffer = null)
     {
-        if (in_array($command, ['env:encrypt', 'env:decrypt'], true)) {
-            $this->bootstrapWithoutBootingProviders();
-        }
-
         $this->bootstrap();
+
+        if (! $this->commandsLoaded) {
+            $this->commands();
+
+            $this->commandsLoaded = true;
+        }
 
         return $this->getArtisan()->call($command, $parameters, $outputBuffer);
     }
@@ -404,7 +224,7 @@ class Kernel implements KernelContract
      * Queue the given console command.
      *
      * @param  string  $command
-     * @param  array  $parameters
+     * @param  array   $parameters
      * @return \Illuminate\Foundation\Bus\PendingDispatch
      */
     public function queue($command, array $parameters = [])
@@ -447,27 +267,10 @@ class Kernel implements KernelContract
             $this->app->bootstrapWith($this->bootstrappers());
         }
 
+        // If we are calling an arbitrary command from within the application, we'll load
+        // all of the available deferred providers which will make all of the commands
+        // available to an application. Otherwise the command will not be available.
         $this->app->loadDeferredProviders();
-
-        if (! $this->commandsLoaded) {
-            $this->commands();
-
-            $this->commandsLoaded = true;
-        }
-    }
-
-    /**
-     * Bootstrap the application without booting service providers.
-     *
-     * @return void
-     */
-    public function bootstrapWithoutBootingProviders()
-    {
-        $this->app->bootstrapWith(
-            collect($this->bootstrappers())->reject(function ($bootstrapper) {
-                return $bootstrapper === \Illuminate\Foundation\Bootstrap\BootProviders::class;
-            })->all()
-        );
     }
 
     /**
@@ -478,14 +281,8 @@ class Kernel implements KernelContract
     protected function getArtisan()
     {
         if (is_null($this->artisan)) {
-            $this->artisan = (new Artisan($this->app, $this->events, $this->app->version()))
-                                    ->resolveCommands($this->commands)
-                                    ->setContainerCommandLoader();
-
-            if ($this->symfonyDispatcher instanceof EventDispatcher) {
-                $this->artisan->setDispatcher($this->symfonyDispatcher);
-                $this->artisan->setSignalsToDispatchEvent();
-            }
+            return $this->artisan = (new Artisan($this->app, $this->events, $this->app->version()))
+                                ->resolveCommands($this->commands);
         }
 
         return $this->artisan;
@@ -494,7 +291,7 @@ class Kernel implements KernelContract
     /**
      * Set the Artisan application instance.
      *
-     * @param  \Illuminate\Console\Application|null  $artisan
+     * @param  \Illuminate\Console\Application  $artisan
      * @return void
      */
     public function setArtisan($artisan)
@@ -515,22 +312,22 @@ class Kernel implements KernelContract
     /**
      * Report the exception to the exception handler.
      *
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return void
      */
-    protected function reportException(Throwable $e)
+    protected function reportException(Exception $e)
     {
         $this->app[ExceptionHandler::class]->report($e);
     }
 
     /**
-     * Render the given exception.
+     * Report the exception to the exception handler.
      *
      * @param  \Symfony\Component\Console\Output\OutputInterface  $output
-     * @param  \Throwable  $e
+     * @param  \Exception  $e
      * @return void
      */
-    protected function renderException($output, Throwable $e)
+    protected function renderException($output, Exception $e)
     {
         $this->app[ExceptionHandler::class]->renderForConsole($output, $e);
     }

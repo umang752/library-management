@@ -2,12 +2,10 @@
 
 namespace Illuminate\Http;
 
-use Illuminate\Container\Container;
-use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
-use Illuminate\Contracts\Filesystem\FileNotFoundException;
-use Illuminate\Http\Testing\FileFactory;
 use Illuminate\Support\Arr;
+use Illuminate\Container\Container;
 use Illuminate\Support\Traits\Macroable;
+use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
 use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 
 class UploadedFile extends SymfonyUploadedFile
@@ -21,7 +19,7 @@ class UploadedFile extends SymfonyUploadedFile
      */
     public static function fake()
     {
-        return new FileFactory;
+        return new Testing\FileFactory;
     }
 
     /**
@@ -31,7 +29,7 @@ class UploadedFile extends SymfonyUploadedFile
      * @param  array|string  $options
      * @return string|false
      */
-    public function store($path = '', $options = [])
+    public function store($path, $options = [])
     {
         return $this->storeAs($path, $this->hashName(), $this->parseOptions($options));
     }
@@ -43,7 +41,7 @@ class UploadedFile extends SymfonyUploadedFile
      * @param  array|string  $options
      * @return string|false
      */
-    public function storePublicly($path = '', $options = [])
+    public function storePublicly($path, $options = [])
     {
         $options = $this->parseOptions($options);
 
@@ -60,12 +58,8 @@ class UploadedFile extends SymfonyUploadedFile
      * @param  array|string  $options
      * @return string|false
      */
-    public function storePubliclyAs($path, $name = null, $options = [])
+    public function storePubliclyAs($path, $name, $options = [])
     {
-        if (is_null($name) || is_array($name)) {
-            [$path, $name, $options] = ['', $path, $name ?? []];
-        }
-
         $options = $this->parseOptions($options);
 
         $options['visibility'] = 'public';
@@ -77,16 +71,12 @@ class UploadedFile extends SymfonyUploadedFile
      * Store the uploaded file on a filesystem disk.
      *
      * @param  string  $path
-     * @param  string|array  $name
+     * @param  string  $name
      * @param  array|string  $options
      * @return string|false
      */
-    public function storeAs($path, $name = null, $options = [])
+    public function storeAs($path, $name, $options = [])
     {
-        if (is_null($name) || is_array($name)) {
-            [$path, $name, $options] = ['', $path, $name ?? []];
-        }
-
         $options = $this->parseOptions($options);
 
         $disk = Arr::pull($options, 'disk');
@@ -97,36 +87,10 @@ class UploadedFile extends SymfonyUploadedFile
     }
 
     /**
-     * Get the contents of the uploaded file.
-     *
-     * @return false|string
-     *
-     * @throws \Illuminate\Contracts\Filesystem\FileNotFoundException
-     */
-    public function get()
-    {
-        if (! $this->isValid()) {
-            throw new FileNotFoundException("File does not exist at path {$this->getPathname()}.");
-        }
-
-        return file_get_contents($this->getPathname());
-    }
-
-    /**
-     * Get the file's extension supplied by the client.
-     *
-     * @return string
-     */
-    public function clientExtension()
-    {
-        return $this->guessClientExtension();
-    }
-
-    /**
      * Create a new file instance from a base instance.
      *
      * @param  \Symfony\Component\HttpFoundation\File\UploadedFile  $file
-     * @param  bool  $test
+     * @param  bool $test
      * @return static
      */
     public static function createFromBase(SymfonyUploadedFile $file, $test = false)
@@ -135,6 +99,7 @@ class UploadedFile extends SymfonyUploadedFile
             $file->getPathname(),
             $file->getClientOriginalName(),
             $file->getClientMimeType(),
+            $file->getClientSize(),
             $file->getError(),
             $test
         );

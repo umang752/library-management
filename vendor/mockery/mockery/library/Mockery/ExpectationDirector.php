@@ -1,17 +1,28 @@
 <?php
-
 /**
- * Mockery (https://docs.mockery.io/)
+ * Mockery
  *
- * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @link      https://github.com/mockery/mockery for the canonical source repository
+ * LICENSE
+ *
+ * This source file is subject to the new BSD license that is bundled
+ * with this package in the file LICENSE.txt.
+ * It is also available through the world-wide-web at this URL:
+ * http://github.com/padraic/mockery/blob/master/LICENSE
+ * If you did not receive a copy of the license and are unable to
+ * obtain it through the world-wide-web, please send an email
+ * to padraic@php.net so we can send you a copy immediately.
+ *
+ * @category   Mockery
+ * @package    Mockery
+ * @copyright  Copyright (c) 2010-2014 Pádraic Brady (http://blog.astrumfutura.com)
+ * @license    http://github.com/padraic/mockery/blob/master/LICENSE New BSD License
  */
 
 namespace Mockery;
 
 class ExpectationDirector
 {
+
     /**
      * Method name the director is directing
      *
@@ -22,7 +33,7 @@ class ExpectationDirector
     /**
      * Mock object the director is attached to
      *
-     * @var \Mockery\MockInterface|\Mockery\LegacyMockInterface
+     * @var \Mockery\MockInterface
      */
     protected $_mock = null;
 
@@ -51,9 +62,9 @@ class ExpectationDirector
      * Constructor
      *
      * @param string $name
-     * @param \Mockery\LegacyMockInterface $mock
+     * @param \Mockery\MockInterface $mock
      */
-    public function __construct($name, \Mockery\LegacyMockInterface $mock)
+    public function __construct($name, \Mockery\MockInterface $mock)
     {
         $this->_name = $name;
         $this->_mock = $mock;
@@ -62,7 +73,7 @@ class ExpectationDirector
     /**
      * Add a new expectation to the director
      *
-     * @param \Mockery\Expectation $expectation
+     * @param Mutateme\Expectation $expectation
      */
     public function addExpectation(\Mockery\Expectation $expectation)
     {
@@ -123,24 +134,18 @@ class ExpectationDirector
      */
     public function findExpectation(array $args)
     {
-        $expectation = null;
-
         if (!empty($this->_expectations)) {
-            $expectation = $this->_findExpectationIn($this->_expectations, $args);
+            return $this->_findExpectationIn($this->_expectations, $args);
+        } else {
+            return $this->_findExpectationIn($this->_defaults, $args);
         }
-
-        if ($expectation === null && !empty($this->_defaults)) {
-            $expectation = $this->_findExpectationIn($this->_defaults, $args);
-        }
-
-        return $expectation;
     }
 
     /**
      * Make the given expectation a default for all others assuming it was
      * correctly created last
      *
-     * @param \Mockery\Expectation $expectation
+     * @param \Mockery\Expectation
      */
     public function makeExpectationDefault(\Mockery\Expectation $expectation)
     {
@@ -165,7 +170,7 @@ class ExpectationDirector
     protected function _findExpectationIn(array $expectations, array $args)
     {
         foreach ($expectations as $exp) {
-            if ($exp->isEligible() && $exp->matchArgs($args)) {
+            if ($exp->matchArgs($args) && $exp->isEligible()) {
                 return $exp;
             }
         }
@@ -187,30 +192,12 @@ class ExpectationDirector
     }
 
     /**
-     * Return all expectations assigned to this director
-     *
-     * @return array
-     */
-    public function getDefaultExpectations()
-    {
-        return $this->_defaults;
-    }
-
-    /**
      * Return the number of expectations assigned to this director.
      *
      * @return int
      */
     public function getExpectationCount()
     {
-        $count = 0;
-        /** @var Expectation $expectations */
-        $expectations = $this->getExpectations() ?: $this->getDefaultExpectations();
-        foreach ($expectations as $expectation) {
-            if ($expectation->isCallCountConstrained()) {
-                $count++;
-            }
-        }
-        return $count;
+        return count($this->getExpectations());
     }
 }

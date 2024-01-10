@@ -11,14 +11,14 @@
 
 namespace Symfony\Component\HttpKernel\Fragment;
 
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Controller\ControllerReference;
-use Symfony\Component\HttpKernel\Event\ExceptionEvent;
+use Symfony\Component\HttpKernel\Event\GetResponseForExceptionEvent;
 use Symfony\Component\HttpKernel\HttpCache\SubRequestHandler;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
 /**
  * Implements the inline rendering strategy where the Request is rendered by the current HTTP kernel.
@@ -27,8 +27,8 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  */
 class InlineFragmentRenderer extends RoutableFragmentRenderer
 {
-    private HttpKernelInterface $kernel;
-    private ?EventDispatcherInterface $dispatcher;
+    private $kernel;
+    private $dispatcher;
 
     public function __construct(HttpKernelInterface $kernel, EventDispatcherInterface $dispatcher = null)
     {
@@ -37,11 +37,13 @@ class InlineFragmentRenderer extends RoutableFragmentRenderer
     }
 
     /**
+     * {@inheritdoc}
+     *
      * Additional available options:
      *
      *  * alt: an alternative URI to render in case of an error
      */
-    public function render(string|ControllerReference $uri, Request $request, array $options = []): Response
+    public function render($uri, Request $request, array $options = [])
     {
         $reference = null;
         if ($uri instanceof ControllerReference) {
@@ -80,9 +82,9 @@ class InlineFragmentRenderer extends RoutableFragmentRenderer
             // we dispatch the exception event to trigger the logging
             // the response that comes back is ignored
             if (isset($options['ignore_errors']) && $options['ignore_errors'] && $this->dispatcher) {
-                $event = new ExceptionEvent($this->kernel, $request, HttpKernelInterface::SUB_REQUEST, $e);
+                $event = new GetResponseForExceptionEvent($this->kernel, $request, HttpKernelInterface::SUB_REQUEST, $e);
 
-                $this->dispatcher->dispatch($event, KernelEvents::EXCEPTION);
+                $this->dispatcher->dispatch(KernelEvents::EXCEPTION, $event);
             }
 
             // let's clean up the output buffers that were created by the sub-request
@@ -103,10 +105,7 @@ class InlineFragmentRenderer extends RoutableFragmentRenderer
         }
     }
 
-    /**
-     * @return Request
-     */
-    protected function createSubRequest(string $uri, Request $request)
+    protected function createSubRequest($uri, Request $request)
     {
         $cookies = $request->cookies->all();
         $server = $request->server->all();
@@ -119,10 +118,9 @@ class InlineFragmentRenderer extends RoutableFragmentRenderer
             $subRequest->headers->set('Surrogate-Capability', $request->headers->get('Surrogate-Capability'));
         }
 
-        static $setSession;
-
-        $setSession ??= \Closure::bind(static function ($subRequest, $request) { $subRequest->session = $request->session; }, null, Request::class);
-        $setSession($subRequest, $request);
+        if ($session = $request->getSession()) {
+            $subRequest->setSession($session);
+        }
 
         if ($request->get('_format')) {
             $subRequest->attributes->set('_format', $request->get('_format'));
@@ -130,17 +128,14 @@ class InlineFragmentRenderer extends RoutableFragmentRenderer
         if ($request->getDefaultLocale() !== $request->getLocale()) {
             $subRequest->setLocale($request->getLocale());
         }
-        if ($request->attributes->has('_stateless')) {
-            $subRequest->attributes->set('_stateless', $request->attributes->get('_stateless'));
-        }
-        if ($request->attributes->has('_check_controller_is_allowed')) {
-            $subRequest->attributes->set('_check_controller_is_allowed', $request->attributes->get('_check_controller_is_allowed'));
-        }
 
         return $subRequest;
     }
 
-    public function getName(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getName()
     {
         return 'inline';
     }

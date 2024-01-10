@@ -2,13 +2,13 @@
 
 namespace Illuminate\Broadcasting;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Broadcasting\Factory as BroadcastingFactory;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Contracts\Support\Arrayable;
-use Illuminate\Support\Arr;
 use ReflectionClass;
 use ReflectionProperty;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\Job;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Contracts\Support\Arrayable;
+use Illuminate\Contracts\Broadcasting\Broadcaster;
 
 class BroadcastEvent implements ShouldQueue
 {
@@ -22,34 +22,6 @@ class BroadcastEvent implements ShouldQueue
     public $event;
 
     /**
-     * The number of times the job may be attempted.
-     *
-     * @var int
-     */
-    public $tries;
-
-    /**
-     * The number of seconds the job can run before timing out.
-     *
-     * @var int
-     */
-    public $timeout;
-
-    /**
-     * The number of seconds to wait before retrying the job when encountering an uncaught exception.
-     *
-     * @var int
-     */
-    public $backoff;
-
-    /**
-     * The maximum number of unhandled exceptions to allow before failing.
-     *
-     * @var int
-     */
-    public $maxExceptions;
-
-    /**
      * Create a new job handler instance.
      *
      * @param  mixed  $event
@@ -58,41 +30,23 @@ class BroadcastEvent implements ShouldQueue
     public function __construct($event)
     {
         $this->event = $event;
-        $this->tries = property_exists($event, 'tries') ? $event->tries : null;
-        $this->timeout = property_exists($event, 'timeout') ? $event->timeout : null;
-        $this->backoff = property_exists($event, 'backoff') ? $event->backoff : null;
-        $this->afterCommit = property_exists($event, 'afterCommit') ? $event->afterCommit : null;
-        $this->maxExceptions = property_exists($event, 'maxExceptions') ? $event->maxExceptions : null;
     }
 
     /**
      * Handle the queued job.
      *
-     * @param  \Illuminate\Contracts\Broadcasting\Factory  $manager
+     * @param  \Illuminate\Contracts\Broadcasting\Broadcaster  $broadcaster
      * @return void
      */
-    public function handle(BroadcastingFactory $manager)
+    public function handle(Broadcaster $broadcaster)
     {
         $name = method_exists($this->event, 'broadcastAs')
                 ? $this->event->broadcastAs() : get_class($this->event);
 
-        $channels = Arr::wrap($this->event->broadcastOn());
-
-        if (empty($channels)) {
-            return;
-        }
-
-        $connections = method_exists($this->event, 'broadcastConnections')
-                            ? $this->event->broadcastConnections()
-                            : [null];
-
-        $payload = $this->getPayloadFromEvent($this->event);
-
-        foreach ($connections as $connection) {
-            $manager->connection($connection)->broadcast(
-                $channels, $name, $payload
-            );
-        }
+        $broadcaster->broadcast(
+            array_wrap($this->event->broadcastOn()), $name,
+            $this->getPayloadFromEvent($this->event)
+        );
     }
 
     /**
@@ -103,9 +57,10 @@ class BroadcastEvent implements ShouldQueue
      */
     protected function getPayloadFromEvent($event)
     {
-        if (method_exists($event, 'broadcastWith') &&
-            ! is_null($payload = $event->broadcastWith())) {
-            return array_merge($payload, ['socket' => data_get($event, 'socket')]);
+        if (method_exists($event, 'broadcastWith')) {
+            return array_merge(
+                $event->broadcastWith(), ['socket' => data_get($event, 'socket')]
+            );
         }
 
         $payload = [];
@@ -142,15 +97,5 @@ class BroadcastEvent implements ShouldQueue
     public function displayName()
     {
         return get_class($this->event);
-    }
-
-    /**
-     * Prepare the instance for cloning.
-     *
-     * @return void
-     */
-    public function __clone()
-    {
-        $this->event = clone $this->event;
     }
 }

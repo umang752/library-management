@@ -3,7 +3,6 @@
 namespace Illuminate\Foundation\Auth\Access;
 
 use Illuminate\Contracts\Auth\Access\Gate;
-use Illuminate\Support\Str;
 
 trait AuthorizesRequests
 {
@@ -18,7 +17,7 @@ trait AuthorizesRequests
      */
     public function authorize($ability, $arguments = [])
     {
-        [$ability, $arguments] = $this->parseAbilityAndArguments($ability, $arguments);
+        list($ability, $arguments) = $this->parseAbilityAndArguments($ability, $arguments);
 
         return app(Gate::class)->authorize($ability, $arguments);
     }
@@ -35,7 +34,7 @@ trait AuthorizesRequests
      */
     public function authorizeForUser($user, $ability, $arguments = [])
     {
-        [$ability, $arguments] = $this->parseAbilityAndArguments($ability, $arguments);
+        list($ability, $arguments) = $this->parseAbilityAndArguments($ability, $arguments);
 
         return app(Gate::class)->forUser($user)->authorize($ability, $arguments);
     }
@@ -49,7 +48,7 @@ trait AuthorizesRequests
      */
     protected function parseAbilityAndArguments($ability, $arguments)
     {
-        if (is_string($ability) && ! str_contains($ability, '\\')) {
+        if (is_string($ability) && strpos($ability, '\\') === false) {
             return [$ability, $arguments];
         }
 
@@ -68,25 +67,21 @@ trait AuthorizesRequests
     {
         $map = $this->resourceAbilityMap();
 
-        return $map[$ability] ?? $ability;
+        return isset($map[$ability]) ? $map[$ability] : $ability;
     }
 
     /**
      * Authorize a resource action based on the incoming request.
      *
-     * @param  string|array  $model
-     * @param  string|array|null  $parameter
+     * @param  string  $model
+     * @param  string|null  $parameter
      * @param  array  $options
      * @param  \Illuminate\Http\Request|null  $request
      * @return void
      */
     public function authorizeResource($model, $parameter = null, array $options = [], $request = null)
     {
-        $model = is_array($model) ? implode(',', $model) : $model;
-
-        $parameter = is_array($parameter) ? implode(',', $parameter) : $parameter;
-
-        $parameter = $parameter ?: Str::snake(class_basename($model));
+        $parameter = $parameter ?: lcfirst(class_basename($model));
 
         $middleware = [];
 
@@ -109,7 +104,6 @@ trait AuthorizesRequests
     protected function resourceAbilityMap()
     {
         return [
-            'index' => 'viewAny',
             'show' => 'view',
             'create' => 'create',
             'store' => 'create',

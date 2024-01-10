@@ -2,6 +2,8 @@
 
 namespace Illuminate\Auth;
 
+use Illuminate\Support\Str;
+
 class Recaller
 {
     /**
@@ -19,7 +21,7 @@ class Recaller
      */
     public function __construct($recaller)
     {
-        $this->recaller = @unserialize($recaller, ['allowed_classes' => false]) ?: $recaller;
+        $this->recaller = $recaller;
     }
 
     /**
@@ -29,7 +31,7 @@ class Recaller
      */
     public function id()
     {
-        return explode('|', $this->recaller, 3)[0];
+        return explode('|', $this->recaller, 2)[0];
     }
 
     /**
@@ -39,17 +41,7 @@ class Recaller
      */
     public function token()
     {
-        return explode('|', $this->recaller, 3)[1];
-    }
-
-    /**
-     * Get the password from the recaller.
-     *
-     * @return string
-     */
-    public function hash()
-    {
-        return explode('|', $this->recaller, 4)[2];
+        return explode('|', $this->recaller, 2)[1];
     }
 
     /**
@@ -59,7 +51,7 @@ class Recaller
      */
     public function valid()
     {
-        return $this->properString() && $this->hasAllSegments();
+        return $this->properString() && $this->hasBothSegments();
     }
 
     /**
@@ -69,28 +61,18 @@ class Recaller
      */
     protected function properString()
     {
-        return is_string($this->recaller) && str_contains($this->recaller, '|');
+        return is_string($this->recaller) && Str::contains($this->recaller, '|');
     }
 
     /**
-     * Determine if the recaller has all segments.
+     * Determine if the recaller has both segments.
      *
      * @return bool
      */
-    protected function hasAllSegments()
+    protected function hasBothSegments()
     {
         $segments = explode('|', $this->recaller);
 
-        return count($segments) >= 3 && trim($segments[0]) !== '' && trim($segments[1]) !== '';
-    }
-
-    /**
-     * Get the recaller's segments.
-     *
-     * @return array
-     */
-    public function segments()
-    {
-        return explode('|', $this->recaller);
+        return count($segments) == 2 && trim($segments[0]) !== '' && trim($segments[1]) !== '';
     }
 }

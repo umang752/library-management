@@ -1,13 +1,5 @@
 <?php
 
-/**
- * Mockery (https://docs.mockery.io/)
- *
- * @copyright https://github.com/mockery/mockery/blob/HEAD/COPYRIGHT.md
- * @license   https://github.com/mockery/mockery/blob/HEAD/LICENSE BSD 3-Clause License
- * @link      https://github.com/mockery/mockery for the canonical source repository
- */
-
 namespace Mockery\Generator;
 
 /**
@@ -16,6 +8,8 @@ namespace Mockery\Generator;
  */
 class MockConfiguration
 {
+    protected static $mockCounter = 0;
+
     /**
      * A class that we'd like to mock
      */
@@ -28,13 +22,6 @@ class MockConfiguration
      */
     protected $targetInterfaces = array();
     protected $targetInterfaceNames = array();
-
-    /**
-     * A number of traits we'd like to mock, keyed by name to attempt to
-     * keep unique
-     */
-    protected $targetTraits = array();
-    protected $targetTraitNames = array();
 
     /**
      * An object we'd like our mock to proxy to
@@ -75,31 +62,14 @@ class MockConfiguration
      */
     protected $allMethods;
 
-    /**
-     * If true, overrides original class destructor
-     */
-    protected $mockOriginalDestructor = false;
-
-    protected $constantsMap = array();
-
-    public function __construct(
-        array $targets = array(),
-        array $blackListedMethods = array(),
-        array $whiteListedMethods = array(),
-        $name = null,
-        $instanceMock = false,
-        array $parameterOverrides = array(),
-        $mockOriginalDestructor = false,
-        array $constantsMap = array()
-    ) {
+    public function __construct(array $targets = array(), array $blackListedMethods = array(), array $whiteListedMethods = array(), $name = null, $instanceMock = false, array $parameterOverrides = array())
+    {
         $this->addTargets($targets);
         $this->blackListedMethods = $blackListedMethods;
         $this->whiteListedMethods = $whiteListedMethods;
         $this->name = $name;
         $this->instanceMock = $instanceMock;
         $this->parameterOverrides = $parameterOverrides;
-        $this->mockOriginalDestructor = $mockOriginalDestructor;
-        $this->constantsMap = $constantsMap;
     }
 
     /**
@@ -112,15 +82,13 @@ class MockConfiguration
     public function getHash()
     {
         $vars = array(
-            'targetClassName'        => $this->targetClassName,
-            'targetInterfaceNames'   => $this->targetInterfaceNames,
-            'targetTraitNames'       => $this->targetTraitNames,
-            'name'                   => $this->name,
-            'blackListedMethods'     => $this->blackListedMethods,
-            'whiteListedMethod'      => $this->whiteListedMethods,
-            'instanceMock'           => $this->instanceMock,
-            'parameterOverrides'     => $this->parameterOverrides,
-            'mockOriginalDestructor' => $this->mockOriginalDestructor
+            'targetClassName' => $this->targetClassName,
+            'targetInterfaceNames' => $this->targetInterfaceNames,
+            'name' => $this->name,
+            'blackListedMethods' => $this->blackListedMethods,
+            'whiteListedMethod' => $this->whiteListedMethods,
+            'instanceMock' => $this->instanceMock,
+            'parameterOverrides' => $this->parameterOverrides,
         );
 
         return md5(serialize($vars));
@@ -224,10 +192,6 @@ class MockConfiguration
             $targets = array_merge($targets, $this->targetInterfaceNames);
         }
 
-        if ($this->targetTraitNames) {
-            $targets = array_merge($targets, $this->targetTraitNames);
-        }
-
         if ($this->targetObject) {
             $targets[] = $this->targetObject;
         }
@@ -238,9 +202,7 @@ class MockConfiguration
             $this->whiteListedMethods,
             $className,
             $this->instanceMock,
-            $this->parameterOverrides,
-            $this->mockOriginalDestructor,
-            $this->constantsMap
+            $this->parameterOverrides
         );
     }
 
@@ -263,11 +225,6 @@ class MockConfiguration
 
         if (interface_exists($target)) {
             $this->addTargetInterfaceName($target);
-            return $this;
-        }
-
-        if (trait_exists($target)) {
-            $this->addTargetTraitName($target);
             return $this;
         }
 
@@ -308,15 +265,7 @@ class MockConfiguration
         }
 
         if (class_exists($this->targetClassName)) {
-            $alias = null;
-            if (strpos($this->targetClassName, '@') !== false) {
-                $alias = (new MockNameBuilder())
-                    ->addPart('anonymous_class')
-                    ->addPart(md5($this->targetClassName))
-                    ->build();
-                class_alias($this->targetClassName, $alias);
-            }
-            $dtc = DefinedTargetClass::factory($this->targetClassName, $alias);
+            $dtc = DefinedTargetClass::factory($this->targetClassName);
 
             if ($this->getTargetObject() == false && $dtc->isFinal()) {
                 throw new \Mockery\Exception(
@@ -330,24 +279,10 @@ class MockConfiguration
 
             $this->targetClass = $dtc;
         } else {
-            $this->targetClass = UndefinedTargetClass::factory($this->targetClassName);
+            $this->targetClass = new UndefinedTargetClass($this->targetClassName);
         }
 
         return $this->targetClass;
-    }
-
-    public function getTargetTraits()
-    {
-        if (!empty($this->targetTraits)) {
-            return $this->targetTraits;
-        }
-
-        foreach ($this->targetTraitNames as $targetTrait) {
-            $this->targetTraits[] = DefinedTargetClass::factory($targetTrait);
-        }
-
-        $this->targetTraits = array_unique($this->targetTraits); // just in case
-        return $this->targetTraits;
     }
 
     public function getTargetInterfaces()
@@ -358,8 +293,8 @@ class MockConfiguration
 
         foreach ($this->targetInterfaceNames as $targetInterface) {
             if (!interface_exists($targetInterface)) {
-                $this->targetInterfaces[] = UndefinedTargetClass::factory($targetInterface);
-                continue;
+                $this->targetInterfaces[] = new UndefinedTargetClass($targetInterface);
+                return;
             }
 
             $dtc = DefinedTargetClass::factory($targetInterface);
@@ -414,23 +349,24 @@ class MockConfiguration
      */
     public function generateName()
     {
-        $nameBuilder = new MockNameBuilder();
+        $name = 'Mockery_' . static::$mockCounter++;
 
         if ($this->getTargetObject()) {
-            $className = get_class($this->getTargetObject());
-            $nameBuilder->addPart(strpos($className, '@') !== false ? md5($className) : $className);
+            $name .= "_" . str_replace("\\", "_", get_class($this->getTargetObject()));
         }
 
         if ($this->getTargetClass()) {
-            $className = $this->getTargetClass()->getName();
-            $nameBuilder->addPart(strpos($className, '@') !== false ? md5($className) : $className);
+            $name .= "_" . str_replace("\\", "_", $this->getTargetClass()->getName());
         }
 
-        foreach ($this->getTargetInterfaces() as $targetInterface) {
-            $nameBuilder->addPart($targetInterface->getName());
+        if ($this->getTargetInterfaces()) {
+            $name .= array_reduce($this->getTargetInterfaces(), function ($tmpname, $i) {
+                $tmpname .= '_' . str_replace("\\", "_", $i->getName());
+                return $tmpname;
+            }, '');
         }
 
-        return $nameBuilder->build();
+        return $name;
     }
 
     public function getShortName()
@@ -471,11 +407,6 @@ class MockConfiguration
         return $this->parameterOverrides;
     }
 
-    public function isMockOriginalDestructor()
-    {
-        return $this->mockOriginalDestructor;
-    }
-
     protected function setTargetClassName($targetClassName)
     {
         $this->targetClassName = $targetClassName;
@@ -496,14 +427,6 @@ class MockConfiguration
         $methods = array();
         foreach ($classes as $class) {
             $methods = array_merge($methods, $class->getMethods());
-        }
-
-        foreach ($this->getTargetTraits() as $trait) {
-            foreach ($trait->getMethods() as $method) {
-                if ($method->isAbstract()) {
-                    $methods[] = $method;
-                }
-            }
         }
 
         $names = array();
@@ -529,18 +452,9 @@ class MockConfiguration
         $this->targetInterfaceNames[] = $targetInterface;
     }
 
-    protected function addTargetTraitName($targetTraitName)
-    {
-        $this->targetTraitNames[] = $targetTraitName;
-    }
 
     protected function setTargetObject($object)
     {
         $this->targetObject = $object;
-    }
-
-    public function getConstantsMap()
-    {
-        return $this->constantsMap;
     }
 }

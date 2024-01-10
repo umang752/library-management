@@ -13,9 +13,10 @@ namespace Symfony\Component\HttpKernel\Bundle;
 
 use Symfony\Component\Console\Application;
 use Symfony\Component\DependencyInjection\Container;
+use Symfony\Component\DependencyInjection\ContainerAwareTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
+use Symfony\Component\Finder\Finder;
 
 /**
  * An implementation of BundleInterface that adds a few conventions for DependencyInjection extensions.
@@ -24,35 +25,32 @@ use Symfony\Component\DependencyInjection\Extension\ExtensionInterface;
  */
 abstract class Bundle implements BundleInterface
 {
+    use ContainerAwareTrait;
+
     protected $name;
     protected $extension;
     protected $path;
-    private string $namespace;
+    private $namespace;
 
     /**
-     * @var ContainerInterface|null
-     */
-    protected $container;
-
-    /**
-     * @return void
+     * {@inheritdoc}
      */
     public function boot()
     {
     }
 
     /**
-     * @return void
+     * {@inheritdoc}
      */
     public function shutdown()
     {
     }
 
     /**
+     * {@inheritdoc}
+     *
      * This method can be overridden to register compilation passes,
      * other extensions, ...
-     *
-     * @return void
      */
     public function build(ContainerBuilder $container)
     {
@@ -61,16 +59,18 @@ abstract class Bundle implements BundleInterface
     /**
      * Returns the bundle's container extension.
      *
+     * @return ExtensionInterface|null The container extension
+     *
      * @throws \LogicException
      */
-    public function getContainerExtension(): ?ExtensionInterface
+    public function getContainerExtension()
     {
-        if (!isset($this->extension)) {
+        if (null === $this->extension) {
             $extension = $this->createContainerExtension();
 
             if (null !== $extension) {
                 if (!$extension instanceof ExtensionInterface) {
-                    throw new \LogicException(sprintf('Extension "%s" must implement Symfony\Component\DependencyInjection\Extension\ExtensionInterface.', get_debug_type($extension)));
+                    throw new \LogicException(sprintf('Extension "%s" must implement Symfony\Component\DependencyInjection\Extension\ExtensionInterface.', \get_class($extension)));
                 }
 
                 // check naming convention
@@ -90,18 +90,24 @@ abstract class Bundle implements BundleInterface
         return $this->extension ?: null;
     }
 
-    public function getNamespace(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getNamespace()
     {
-        if (!isset($this->namespace)) {
+        if (null === $this->namespace) {
             $this->parseClassName();
         }
 
         return $this->namespace;
     }
 
-    public function getPath(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getPath()
     {
-        if (!isset($this->path)) {
+        if (null === $this->path) {
             $reflected = new \ReflectionObject($this);
             $this->path = \dirname($reflected->getFileName());
         }
@@ -110,11 +116,18 @@ abstract class Bundle implements BundleInterface
     }
 
     /**
-     * Returns the bundle name (the class short name).
+     * {@inheritdoc}
      */
-    final public function getName(): string
+    public function getParent()
     {
-        if (!isset($this->name)) {
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    final public function getName()
+    {
+        if (null === $this->name) {
             $this->parseClassName();
         }
 
@@ -122,16 +135,55 @@ abstract class Bundle implements BundleInterface
     }
 
     /**
-     * @return void
+     * Finds and registers Commands.
+     *
+     * Override this method if your bundle commands do not follow the conventions:
+     *
+     * * Commands are in the 'Command' sub-directory
+     * * Commands extend Symfony\Component\Console\Command\Command
      */
     public function registerCommands(Application $application)
     {
+        if (!is_dir($dir = $this->getPath().'/Command')) {
+            return;
+        }
+
+        if (!class_exists('Symfony\Component\Finder\Finder')) {
+            throw new \RuntimeException('You need the symfony/finder component to register bundle commands.');
+        }
+
+        $finder = new Finder();
+        $finder->files()->name('*Command.php')->in($dir);
+
+        $prefix = $this->getNamespace().'\\Command';
+        foreach ($finder as $file) {
+            $ns = $prefix;
+            if ($relativePath = $file->getRelativePath()) {
+                $ns .= '\\'.str_replace('/', '\\', $relativePath);
+            }
+            $class = $ns.'\\'.$file->getBasename('.php');
+            if ($this->container) {
+                $commandIds = $this->container->hasParameter('console.command.ids') ? $this->container->getParameter('console.command.ids') : [];
+                $alias = 'console.command.'.strtolower(str_replace('\\', '_', $class));
+                if (isset($commandIds[$alias]) || $this->container->has($alias)) {
+                    continue;
+                }
+            }
+            $r = new \ReflectionClass($class);
+            if ($r->isSubclassOf('Symfony\\Component\\Console\\Command\\Command') && !$r->isAbstract() && !$r->getConstructor()->getNumberOfRequiredParameters()) {
+                @trigger_error(sprintf('Auto-registration of the command "%s" is deprecated since Symfony 3.4 and won\'t be supported in 4.0. Use PSR-4 based service discovery instead.', $class), \E_USER_DEPRECATED);
+
+                $application->add($r->newInstance());
+            }
+        }
     }
 
     /**
      * Returns the bundle's container extension class.
+     *
+     * @return string
      */
-    protected function getContainerExtensionClass(): string
+    protected function getContainerExtensionClass()
     {
         $basename = preg_replace('/Bundle$/', '', $this->getName());
 
@@ -140,21 +192,20 @@ abstract class Bundle implements BundleInterface
 
     /**
      * Creates the bundle's container extension.
+     *
+     * @return ExtensionInterface|null
      */
-    protected function createContainerExtension(): ?ExtensionInterface
+    protected function createContainerExtension()
     {
         return class_exists($class = $this->getContainerExtensionClass()) ? new $class() : null;
     }
 
-    private function parseClassName(): void
+    private function parseClassName()
     {
         $pos = strrpos(static::class, '\\');
         $this->namespace = false === $pos ? '' : substr(static::class, 0, $pos);
-        $this->name ??= false === $pos ? static::class : substr(static::class, $pos + 1);
-    }
-
-    public function setContainer(?ContainerInterface $container): void
-    {
-        $this->container = $container;
+        if (null === $this->name) {
+            $this->name = false === $pos ? static::class : substr(static::class, $pos + 1);
+        }
     }
 }

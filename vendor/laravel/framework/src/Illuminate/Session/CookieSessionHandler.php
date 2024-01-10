@@ -2,15 +2,13 @@
 
 namespace Illuminate\Session;
 
-use Illuminate\Contracts\Cookie\QueueingFactory as CookieJar;
-use Illuminate\Support\InteractsWithTime;
+use Carbon\Carbon;
 use SessionHandlerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Illuminate\Contracts\Cookie\QueueingFactory as CookieJar;
 
 class CookieSessionHandler implements SessionHandlerInterface
 {
-    use InteractsWithTime;
-
     /**
      * The cookie jar instance.
      *
@@ -33,59 +31,45 @@ class CookieSessionHandler implements SessionHandlerInterface
     protected $minutes;
 
     /**
-     * Indicates whether the session should be expired when the browser closes.
-     *
-     * @var bool
-     */
-    protected $expireOnClose;
-
-    /**
      * Create a new cookie driven handler instance.
      *
      * @param  \Illuminate\Contracts\Cookie\QueueingFactory  $cookie
      * @param  int  $minutes
-     * @param  bool  $expireOnClose
      * @return void
      */
-    public function __construct(CookieJar $cookie, $minutes, $expireOnClose = false)
+    public function __construct(CookieJar $cookie, $minutes)
     {
         $this->cookie = $cookie;
         $this->minutes = $minutes;
-        $this->expireOnClose = $expireOnClose;
     }
 
     /**
      * {@inheritdoc}
-     *
-     * @return bool
      */
-    public function open($savePath, $sessionName): bool
+    public function open($savePath, $sessionName)
     {
         return true;
     }
 
     /**
      * {@inheritdoc}
-     *
-     * @return bool
      */
-    public function close(): bool
+    public function close()
     {
         return true;
     }
 
     /**
      * {@inheritdoc}
-     *
-     * @return string|false
      */
-    public function read($sessionId): string|false
+    public function read($sessionId)
     {
         $value = $this->request->cookies->get($sessionId) ?: '';
 
-        if (! is_null($decoded = json_decode($value, true)) && is_array($decoded) &&
-            isset($decoded['expires']) && $this->currentTime() <= $decoded['expires']) {
-            return $decoded['data'];
+        if (! is_null($decoded = json_decode($value, true)) && is_array($decoded)) {
+            if (isset($decoded['expires']) && Carbon::now()->getTimestamp() <= $decoded['expires']) {
+                return $decoded['data'];
+            }
         }
 
         return '';
@@ -93,25 +77,21 @@ class CookieSessionHandler implements SessionHandlerInterface
 
     /**
      * {@inheritdoc}
-     *
-     * @return bool
      */
-    public function write($sessionId, $data): bool
+    public function write($sessionId, $data)
     {
         $this->cookie->queue($sessionId, json_encode([
             'data' => $data,
-            'expires' => $this->availableAt($this->minutes * 60),
-        ]), $this->expireOnClose ? 0 : $this->minutes);
+            'expires' => Carbon::now()->addMinutes($this->minutes)->getTimestamp(),
+        ]), $this->minutes);
 
         return true;
     }
 
     /**
      * {@inheritdoc}
-     *
-     * @return bool
      */
-    public function destroy($sessionId): bool
+    public function destroy($sessionId)
     {
         $this->cookie->queue($this->cookie->forget($sessionId));
 
@@ -120,12 +100,10 @@ class CookieSessionHandler implements SessionHandlerInterface
 
     /**
      * {@inheritdoc}
-     *
-     * @return int
      */
-    public function gc($lifetime): int
+    public function gc($lifetime)
     {
-        return 0;
+        return true;
     }
 
     /**

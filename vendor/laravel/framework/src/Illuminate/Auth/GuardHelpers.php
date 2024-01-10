@@ -3,7 +3,6 @@
 namespace Illuminate\Auth;
 
 use Illuminate\Contracts\Auth\Authenticatable as AuthenticatableContract;
-use Illuminate\Contracts\Auth\UserProvider;
 
 /**
  * These methods are typically the same across all guards.
@@ -13,7 +12,7 @@ trait GuardHelpers
     /**
      * The currently authenticated user.
      *
-     * @var \Illuminate\Contracts\Auth\Authenticatable|null
+     * @var \Illuminate\Contracts\Auth\Authenticatable
      */
     protected $user;
 
@@ -25,7 +24,7 @@ trait GuardHelpers
     protected $provider;
 
     /**
-     * Determine if the current user is authenticated. If not, throw an exception.
+     * Determine if the current user is authenticated.
      *
      * @return \Illuminate\Contracts\Auth\Authenticatable
      *
@@ -33,17 +32,11 @@ trait GuardHelpers
      */
     public function authenticate()
     {
-        return $this->user() ?? throw new AuthenticationException;
-    }
+        if (! is_null($user = $this->user())) {
+            return $user;
+        }
 
-    /**
-     * Determine if the guard has a user instance.
-     *
-     * @return bool
-     */
-    public function hasUser()
-    {
-        return ! is_null($this->user);
+        throw new AuthenticationException;
     }
 
     /**
@@ -69,7 +62,7 @@ trait GuardHelpers
     /**
      * Get the ID for the currently authenticated user.
      *
-     * @return int|string|null
+     * @return int|null
      */
     public function id()
     {
@@ -89,38 +82,5 @@ trait GuardHelpers
         $this->user = $user;
 
         return $this;
-    }
-
-    /**
-     * Forget the current user.
-     *
-     * @return $this
-     */
-    public function forgetUser()
-    {
-        $this->user = null;
-
-        return $this;
-    }
-
-    /**
-     * Get the user provider used by the guard.
-     *
-     * @return \Illuminate\Contracts\Auth\UserProvider
-     */
-    public function getProvider()
-    {
-        return $this->provider;
-    }
-
-    /**
-     * Set the user provider used by the guard.
-     *
-     * @param  \Illuminate\Contracts\Auth\UserProvider  $provider
-     * @return void
-     */
-    public function setProvider(UserProvider $provider)
-    {
-        $this->provider = $provider;
     }
 }

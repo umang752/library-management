@@ -20,78 +20,98 @@ use Symfony\Component\VarDumper\Cloner\Data;
 
 /**
  * @author Abdellatif Ait boudad <a.aitboudad@gmail.com>
- *
- * @final
  */
 class TranslationDataCollector extends DataCollector implements LateDataCollectorInterface
 {
-    private DataCollectorTranslator $translator;
+    private $translator;
 
     public function __construct(DataCollectorTranslator $translator)
     {
         $this->translator = $translator;
     }
 
-    public function lateCollect(): void
+    /**
+     * {@inheritdoc}
+     */
+    public function lateCollect()
     {
         $messages = $this->sanitizeCollectedMessages($this->translator->getCollectedMessages());
 
-        $this->data += $this->computeCount($messages);
+        $this->data = $this->computeCount($messages);
         $this->data['messages'] = $messages;
+
+        $this->data['locale'] = $this->translator->getLocale();
+        $this->data['fallback_locales'] = $this->translator->getFallbackLocales();
 
         $this->data = $this->cloneVar($this->data);
     }
 
-    public function collect(Request $request, Response $response, \Throwable $exception = null): void
+    /**
+     * {@inheritdoc}
+     */
+    public function collect(Request $request, Response $response, \Exception $exception = null)
     {
-        $this->data['locale'] = $this->translator->getLocale();
-        $this->data['fallback_locales'] = $this->translator->getFallbackLocales();
     }
 
-    public function reset(): void
+    /**
+     * {@inheritdoc}
+     */
+    public function reset()
     {
         $this->data = [];
     }
 
-    public function getMessages(): array|Data
+    /**
+     * @return array|Data
+     */
+    public function getMessages()
     {
-        return $this->data['messages'] ?? [];
+        return isset($this->data['messages']) ? $this->data['messages'] : [];
     }
 
-    public function getCountMissings(): int
+    /**
+     * @return int
+     */
+    public function getCountMissings()
     {
-        return $this->data[DataCollectorTranslator::MESSAGE_MISSING] ?? 0;
+        return isset($this->data[DataCollectorTranslator::MESSAGE_MISSING]) ? $this->data[DataCollectorTranslator::MESSAGE_MISSING] : 0;
     }
 
-    public function getCountFallbacks(): int
+    /**
+     * @return int
+     */
+    public function getCountFallbacks()
     {
-        return $this->data[DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK] ?? 0;
+        return isset($this->data[DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK]) ? $this->data[DataCollectorTranslator::MESSAGE_EQUALS_FALLBACK] : 0;
     }
 
-    public function getCountDefines(): int
+    /**
+     * @return int
+     */
+    public function getCountDefines()
     {
-        return $this->data[DataCollectorTranslator::MESSAGE_DEFINED] ?? 0;
+        return isset($this->data[DataCollectorTranslator::MESSAGE_DEFINED]) ? $this->data[DataCollectorTranslator::MESSAGE_DEFINED] : 0;
     }
 
-    public function getLocale(): ?string
+    public function getLocale()
     {
         return !empty($this->data['locale']) ? $this->data['locale'] : null;
     }
 
-    /**
-     * @internal
-     */
-    public function getFallbackLocales(): Data|array
+    public function getFallbackLocales()
     {
         return (isset($this->data['fallback_locales']) && \count($this->data['fallback_locales']) > 0) ? $this->data['fallback_locales'] : [];
     }
 
-    public function getName(): string
+    /**
+     * {@inheritdoc}
+     */
+    public function getName()
     {
         return 'translation';
     }
 
-    private function sanitizeCollectedMessages(array $messages): array
+    private function sanitizeCollectedMessages($messages)
     {
         $result = [];
         foreach ($messages as $key => $message) {
@@ -116,7 +136,7 @@ class TranslationDataCollector extends DataCollector implements LateDataCollecto
         return $result;
     }
 
-    private function computeCount(array $messages): array
+    private function computeCount($messages)
     {
         $count = [
             DataCollectorTranslator::MESSAGE_DEFINED => 0,
@@ -131,7 +151,7 @@ class TranslationDataCollector extends DataCollector implements LateDataCollecto
         return $count;
     }
 
-    private function sanitizeString(string $string, int $length = 80): string
+    private function sanitizeString($string, $length = 80)
     {
         $string = trim(preg_replace('/\s+/', ' ', $string));
 

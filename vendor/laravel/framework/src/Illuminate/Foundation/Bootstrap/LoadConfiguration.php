@@ -3,11 +3,11 @@
 namespace Illuminate\Foundation\Bootstrap;
 
 use Exception;
-use Illuminate\Config\Repository;
-use Illuminate\Contracts\Config\Repository as RepositoryContract;
-use Illuminate\Contracts\Foundation\Application;
 use SplFileInfo;
+use Illuminate\Config\Repository;
 use Symfony\Component\Finder\Finder;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\Config\Repository as RepositoryContract;
 
 class LoadConfiguration
 {
@@ -42,7 +42,9 @@ class LoadConfiguration
         // Finally, we will set the application's environment based on the configuration
         // values that were loaded. We will pass a callback which will be used to get
         // the environment in a web context where an "--env" switch is not present.
-        $app->detectEnvironment(fn () => $config->get('app.env', 'production'));
+        $app->detectEnvironment(function () use ($config) {
+            return $config->get('app.env', 'production');
+        });
 
         date_default_timezone_set($config->get('app.timezone', 'UTC'));
 
@@ -55,7 +57,6 @@ class LoadConfiguration
      * @param  \Illuminate\Contracts\Foundation\Application  $app
      * @param  \Illuminate\Contracts\Config\Repository  $repository
      * @return void
-     *
      * @throws \Exception
      */
     protected function loadConfigurationFiles(Application $app, RepositoryContract $repository)
@@ -88,8 +89,6 @@ class LoadConfiguration
 
             $files[$directory.basename($file->getRealPath(), '.php')] = $file->getRealPath();
         }
-
-        ksort($files, SORT_NATURAL);
 
         return $files;
     }
