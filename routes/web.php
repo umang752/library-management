@@ -35,8 +35,15 @@ Route::get('/forgotPassword',[ForgotPasswordFormController::class,'showForm']);
 Route::post('/forgotPassword',[ForgotPasswordFormController::class,'sendOTP']);
 
 
-Route::get('/user',function(){
-    return view('userPage');
+Route::get('/user',function(Request $request){
+    if(Session::has("User_Role")) {
+        $userRole = Session::get("User_Role");
+    
+        if ($userRole == "User") {
+            return view("userPage");
+        }
+    }
+    return redirect('/login');
 });
 
 // Admin Page Routes:::::

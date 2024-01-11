@@ -8,11 +8,15 @@ class AdminPageController extends Controller
 {
     public function showPage(Request $request){
         // echo "Hello Admin"
-        if($request->session()->has("user_id")){
-            return view("adminPage");
+        if ($request->session()->has("User_Role")) {
+            $userRole = $request->session()->get("User_Role");
+        
+            if ($userRole == "Admin") {
+                return view("adminPage");
+            }
         }
-        else{
+        // else{
             return redirect("/login");
-        }
+        // }
     }
 }

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use App\Models\User;
 
@@ -24,7 +24,9 @@ class LoginFormController extends Controller
                 ->first();
             
         if($user){
-            $request->session()->put("user_id",$user->user_id);
+            // $request->session()->put("User_Role",$user->User_Role);
+            $request->session()->put("User_Role", $user->User_Role);
+            $request->session()->put("expires_at", Carbon::now()->addMinutes(0.5));
             if($user->User_Role ==='User'){
                 return redirect('/user');
             }
