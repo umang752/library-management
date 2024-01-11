@@ -35,6 +35,10 @@ Route::get('/forgotPassword',[ForgotPasswordFormController::class,'showForm']);
 Route::post('/forgotPassword',[ForgotPasswordFormController::class,'sendOTP']);
 
 
+Route::get('/user',function(){
+    return view('userPage');
+});
+
 // Admin Page Routes:::::
 Route::get('/admin',[AdminPageController::class,'showPage']);
 Route::post('/admin',function(){

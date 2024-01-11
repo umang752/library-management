@@ -25,6 +25,9 @@ class LoginFormController extends Controller
             
         if($user){
             $request->session()->put("user_id",$user->user_id);
+            if($user->User_Role ==='User'){
+                return redirect('/user');
+            }
             return redirect('/admin');
             // return view('adminPage');
         }

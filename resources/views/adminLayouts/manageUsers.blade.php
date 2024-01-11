@@ -18,6 +18,7 @@
                 <th>Email</th>
                 <th>Phone Number</th>
                 <th>Status</th>
+                <th>User_Role</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -30,6 +31,7 @@
                 <td>{{$user->email}}</td>
                 <td>{{$user->phone}}</td>
                 <td>{{$user->status}}</td>
+                <td>{{$user->User_Role}}</td>
                 <td>
                     <a href="/manage-users/delete/{{$user->user_id}}"><button class="btn btn-danger ">Delete</button></a>
                     <a href="{{route('edit.user',['id'=>$user->user_id])}}"><button class="btn btn-success">Update</button></a>
