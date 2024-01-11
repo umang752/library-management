@@ -122,7 +122,8 @@
 </head>
 <body>
 
-    <form>
+    <form action="/signin" method="post">
+      @csrf
         <h2>Login</h2>
         <label for="email">Email:</label>
         <input type="email" id="email" name="email" required>
@@ -132,14 +133,17 @@
 
         <button type="submit">Login</button>
         <div style="margin-top: 16px;">
-        <button type="button" href="">Sign Up</button>
-        <!-- <button type="button" href="{{ route('') }}">Sign Up</button> -->
-            <!-- <a href="#">Sign Up</a> -->
+        <!-- <button type="button" href="">Sign Up</button> -->
+        <button type="button" onclick="window.location.href='/signup'">Sign Up</button>
+
+         <!-- <a href="#">Sign Up</a> -->
             
         </div>
 
         <div style="margin-top: 16px;">
-            <a href="#">Forgot Password?</a>
+            <!-- Add a link for "Forgot Password?" -->
+<a href="/forgot-password">Forgot Password?</a>
+
             
         </div>
         

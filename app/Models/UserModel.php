@@ -8,6 +8,17 @@ use Illuminate\Database\Eloquent\Model;
 class UserModel extends Model
 {
     use HasFactory;
+    protected $table = 'user';
+     protected $primaryKey = 'user_id'; 
+     public $timestamps = true;
+     protected $fillable = [
+        'fname',
+        'lname',
+        'email',
+        'password',
+        'phone',
+        'status',
+    ];
     public function book(){
         return $this->hasMany(Book::class);
     }

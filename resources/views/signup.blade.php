@@ -58,7 +58,8 @@
   </style>
 </head>
 <body>
-  <form action="/signup" method="post">
+  <form action="/register" method="post">
+    @csrf
     <label for="fname">First Name:</label>
     <input type="text" id="fname" name="fname" required>
 
@@ -81,7 +82,7 @@
     </select>
 
     <button type="submit">Sign Up</button>
-    <button type="button" class="login-btn" onclick="location.href='login.html';">Login</button>
+    <button type="button" class="login-btn" onclick="window.location.href='/login'">Login</button>
   </form>
 </body>
 </html>

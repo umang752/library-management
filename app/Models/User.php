@@ -17,10 +17,20 @@ class User extends Authenticatable
      *
      * @var array<int, string>
      */
+    protected $table = 'users'; // Specify the table name
+
+    protected $primaryKey = 'user_id'; // Specify the primary key
+
     protected $fillable = [
-        'name',
+        // 'name',
+        // 'email',
+        // 'password',
+        'first_name',
+        'last_name',
         'email',
         'password',
+        'phone',
+        'status',
     ];
 
     /**
@@ -42,4 +52,13 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+    public function book(){
+        return $this->hasMany(Book::class);
+    }
+    public function role(){
+        return $this->hasMany(Role::class);
+    }
+    public function bookissued(){
+        return $this->hasMany(Bookissued::class);
+    }
 }

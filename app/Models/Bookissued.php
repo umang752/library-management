@@ -8,8 +8,18 @@ use Illuminate\Database\Eloquent\Model;
 class Bookissued extends Model
 {
     use HasFactory;
+    protected $table = 'bookissued'; 
+
+    protected $primaryKey = 'issue_id'; 
+
+    protected $fillable = [
+        'user_id',
+        'book_id',
+        'status',
+        'renew_date',
+    ];
     public function user(){
-        return $this->belongsTo(UserModel::class);
+        return $this->belongsTo(User::class);
     }
     public function book(){
         return $this->belongsTo(Book::class);

@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('membership', function (Blueprint $table) {
             $table->bigIncrements('membership_id');
             $table->unsignedBigInteger('user_id')->index();
-            $table->foreign('user_id')->references('user_id')->on('user'); 
+            $table->foreign('user_id')->references('user_id')->on('users'); 
             $table->date('started_date');
             $table->date('end_date');
             $table->text('description');

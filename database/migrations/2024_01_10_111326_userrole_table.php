@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('userrole', function (Blueprint $table) {
             $table->bigIncrements('userrole_id');
             $table->unsignedBigInteger('user_id');
-            $table->foreign('user_id')->references('user_id')->on('user'); 
+            $table->foreign('user_id')->references('user_id')->on('users'); 
             $table->unsignedBigInteger('role_id');
             $table->foreign('role_id')->references('role_id')->on('role'); 
             $table->string('status',20);
