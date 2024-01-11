@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 </head>
 <body>
+<h1 class="text-center" >Users</h1>
+
 <a href="/manage-users/addUser"><button class="btn btn-info" >Add User</button> </a><br><br>
 
     <table class="table">

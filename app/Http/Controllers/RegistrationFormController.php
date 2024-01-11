@@ -15,6 +15,15 @@ class RegistrationFormController extends Controller
         // }
     
         // $data = compact('title');
+        if($request->session()->has("User_Role")){
+            $userRole = $request->session()->get("User_Role");
+            if($userRole=="Admin"){
+                return redirect('/admin');
+            }
+            else{
+                return redirect('/user');
+            }
+        }
         return view('registrationForm'); //->with($data);
     }
     public function saveFormData(Request $request){

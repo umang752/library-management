@@ -46,8 +46,6 @@ class ManageUsersController extends Controller
         return redirect('/manage-users');
     }
     public function addUser(){
-        // $title="Add User";
-        // $data = compact('title');
         return view('adminLayouts/addUserForm'); //->with($data);
     }
 

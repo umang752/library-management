@@ -6,6 +6,8 @@ use App\Http\Controllers\LoginFormController;
 use App\Http\Controllers\AdminPageController;
 use App\Http\Controllers\ForgotPasswordFormController;
 use App\Http\Controllers\ManageUsersController;
+use App\Http\Controllers\UserPageController;
+use App\Http\Controllers\ManageBooksController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -29,22 +31,11 @@ Route::post('/login',[LoginFormController::class,'validateLoginData']);
 
 // Forgot Password Page Routes:::
 Route::get('/forgotPassword',[ForgotPasswordFormController::class,'showForm']);
-// Route::get('/forgotPassword',function(){
-//     return view('forgotPasswordForm');
-// });
 Route::post('/forgotPassword',[ForgotPasswordFormController::class,'sendOTP']);
 
+// User Page Routes::::
+Route::get('/user',[UserPageController::class,'showUserPage']);
 
-Route::get('/user',function(Request $request){
-    if(Session::has("User_Role")) {
-        $userRole = Session::get("User_Role");
-    
-        if ($userRole == "User") {
-            return view("userPage");
-        }
-    }
-    return redirect('/login');
-});
 
 // Admin Page Routes:::::
 Route::get('/admin',[AdminPageController::class,'showPage']);
@@ -58,12 +49,16 @@ Route::get('/logout',function(Request $request){
     // $request->session()->forget("user_id");
     // $request->session()->invalidate();
     // $request->session()->regenerateToken();
-    Session::forget('user_id');
+
+    // Session::forget('user_id');
+    Session::flush();
     Session::invalidate();
     Session::regenerateToken();
     return redirect('/login');
 });
 
+
+// Manage Users Button Routes:::
 Route::get('/manage-users',[ManageUsersController::class,'giveUsers']);
 
 Route::get('/manage-users/delete/{id?}',[ManageUsersController::class,'deleteUser']);
@@ -73,6 +68,13 @@ Route::post('/manage-users/updateHandler',[ManageUsersController::class,'updateU
 Route::get('/manage-users/addUser',[ManageUsersController::class,'addUser']);
 Route::post('/manage-users/addUserHandler',[ManageUsersController::class,'addUserHandler']);
 
-Route::get('/manage-books',);
 
+// Manage Books Button Routes:::
+Route::get('/manage-books',[ManageBooksController::class,'giveBooks']);
+Route::get('/manage-books/deleteBook/{name?}',[ManageBooksController::class,'deleteBook']);
+
+Route::get('/manage-books/addBook',[ManageBooksController::class,'addBook']);
+Route::post('/manage-books/addBookHandler',[ManageBooksController::class,'addBookHandler']);
+
+// Manage Issued Books Button Routes::::
 Route::get('/manage-issued-books',);

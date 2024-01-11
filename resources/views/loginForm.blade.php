@@ -22,7 +22,13 @@
   <div class="container">
     <!-- <x-Input type="text" name="Name" /> -->
     <x-Input type="email" name="Email" />
+    @error('Email')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
     <x-Input type="password" name="Password" />
+    @error('Password')
+        <div class="alert alert-danger">{{ $message }}</div>
+    @enderror
     <button type="submit" class="btn btn-primary">Submit</button>
     <x-Links linkUrl="/register" label="Sign Up" />
     <x-Links linkUrl="/forgotPassword" label="Forgot?" />
