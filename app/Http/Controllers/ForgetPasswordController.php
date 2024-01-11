@@ -22,24 +22,26 @@ class ForgetPasswordController extends Controller
     public function resetPassword(Request $request)
     {
       
-       dd("hiiii");
+    //    dd("hiiii");
         $input = $request->all();
      
         $rules =[
                 
-                'email' => 'required|email|unique:users|max:50',
-                'newpassword' => 'required|min:8',
+                'email' => 'required|exists:users,email|max:50',
+                'password' => 'required|min:8',
                  ];
                  $validator = Validator::make($request->all(), $rules);
              if ($validator->fails()) {
+               
                return redirect()->back()
                 ->withErrors($validator)
                 ->withInput($request->input());
 
             } else {
+               
                 $email = $request->input('email');
-                $newPassword = $request->input('newpassword');
-        
+                $newPassword = $request->input('password');
+        // dd($newPassword);
             $user = User::where('email', $email)->first();
 
  
@@ -50,12 +52,14 @@ class ForgetPasswordController extends Controller
     
     $user->password = $hashedPassword;
     $user->save();
+    // return redirect('/login');
+    return redirect()->to('login')->with('message', 'Password Reset Successfully');;
 
-    return redirect('/login');
-} else {
+    // return view('login')->with('message', 'Your custom message here');
+} else 
     echo "User not found";
 }
        
     }
 }
-    }
+    

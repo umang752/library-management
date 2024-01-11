@@ -121,16 +121,25 @@
         #error-message{
           color:red;
         }
+        #alert-success{
+          color:green;
+          font-size: small;
+        }
     </style>
-</head>
+   
+</head>  
 <body>
-
-    <form action="/signin" method="post">
+<form action="/signin" method="post">
       @csrf
         <h2>Login</h2>
         <label for="email">Email:</label>
         <input type="email" id="email" name="email" required>
-
+        
+        @if (session('message'))
+    <div id="alert-success">
+        {{ session('message') }}
+    </div>
+@endif
         <label for="password">Password:</label>
         <input type="password" id="password" name="password" required>
 
@@ -159,7 +168,7 @@
 @endif
 
     </form>
-
+ 
 </body>
 <script>
     window.onload = function() {
@@ -167,6 +176,14 @@
             var errorMessage = document.getElementById('error-message');
             if (errorMessage) {
                 errorMessage.style.display = 'none';
+            }
+        }, 5000);
+    };
+    window.onload = function() {
+        setTimeout(function() {
+            var successMessage = document.getElementById('alert-success');
+            if (successMessage) {
+                successMessage.style.display = 'none';
             }
         }, 5000);
     };

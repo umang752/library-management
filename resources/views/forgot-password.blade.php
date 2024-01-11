@@ -110,6 +110,7 @@ button[type="submit"]:hover {
 <body>
     <div class="reset-password-container">
         <form action="/reset-password" method="POST">
+            @csrf
             <h2>Reset Password</h2>
 
             <div class="form-group">

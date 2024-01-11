@@ -12,9 +12,9 @@
 
 <div class="contain">
         <div class="text">
-        <h1>Manage Book</h1><br>
+        <h1>Manage User</h1><br>
         <div >
-        <button id="add" type="button" onclick="window.location.href='/addbook'">AddBook</button>
+        <button id="add" type="button" onclick="window.location.href='/addbook'">AddUser</button>
 
         <!-- <a href="/addbook" class="button">Add Book</a> -->
         <!-- <a href="/signup" class="button">Edit</a>
@@ -28,8 +28,9 @@
        
                
                 <tr>
-                <th>book id</th>
-                <th>name</th>
+                <th>user id</th>
+                <th>first name</th>
+                <th>last name</th>
                 <th>description</th>
                 <th>author</th>
                
@@ -62,8 +63,6 @@
                         </td>
                     </tr>
                     @endforeach
-
-                    {{$query ->links()}}
 
                   
 </table>

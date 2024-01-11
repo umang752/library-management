@@ -110,10 +110,16 @@
   </div>
   </div>
   
-    <label for="status">Status:</label>
+    <label for="status">Status</label>
     <select id="status" name="status" required>
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
+    </select>
+
+    <label for="role">Role:</label>
+    <select id="role" name="role" required>
+      <option >Admin</option>
+      <option >Student</option>
     </select>
 
     <button type="submit">Sign Up</button>

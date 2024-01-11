@@ -12,6 +12,7 @@ class RegisterController extends Controller
     //
     public function postRegister(Request $request)
     {
+        
         $input = $request->all();
        try {
         $rules =[
@@ -20,10 +21,12 @@ class RegisterController extends Controller
                 'phone' => 'required|numeric|digits:10',
                 'email' => 'required|email|unique:users|max:50',
                 'status' => 'required|alpha|max:20',
+                'role' => 'required|alpha|max:20',
                 'password' => 'required|min:8',
                  ];
                  $validator = Validator::make($request->all(), $rules);
             if ($validator->fails()) {
+                // dd("hii");
                 // return back()->withErrors([
                 //     'email' => 'The provided credentials do not match our records or the account is not active.',
                 // ])->onlyInput('email');
@@ -37,6 +40,7 @@ class RegisterController extends Controller
                 $user->last_name = $input['lname'];
                 $user->phone_number = $input['phone'];
                 $user->status = $input['status'];
+                $user->role = $input['role'];
                 $user->email = $input['email'];
                 // $user->password =$input['password'];
                 $user->password =Hash::make($request->password);
