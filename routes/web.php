@@ -54,9 +54,13 @@ Route::get('/logout',function(Request $request){
 });
 
 Route::get('/manage-users',[ManageUsersController::class,'giveUsers']);
+
 Route::get('/manage-users/delete/{id?}',[ManageUsersController::class,'deleteUser']);
+
 Route::get('/manage-users/edit/{id?}',[ManageUsersController::class,'editUser'])->name('edit.user');
 
+Route::get('/manage-users/addUser',[ManageUsersController::class,'addUser']);
+Route::post('/manage-users/addUserHandler',[ManageUsersController::class,'addUserHandler']);
 
 Route::get('/manage-books',);
 

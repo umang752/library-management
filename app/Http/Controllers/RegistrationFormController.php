@@ -7,8 +7,15 @@ use App\Models\User;
 
 class RegistrationFormController extends Controller
 {
-    public function doSignUp(){
-        return view('registrationForm');
+    public function doSignUp(Request $request){
+        // if ($request->has('title')) {
+        //     $title = $request->title;
+        // } else {
+        //     $title = "Sign Up Page";
+        // }
+    
+        // $data = compact('title');
+        return view('registrationForm'); //->with($data);
     }
     public function saveFormData(Request $request){
         $request->validate(

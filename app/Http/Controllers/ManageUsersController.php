@@ -30,8 +30,41 @@ class ManageUsersController extends Controller
             return redirect('/manage-users');
         }
         else{
-            
+            $title="Update User";
+            $data = compact('title','user');
+            return view('registrationForm')->with($data);
         }
     }
+    public function addUser(){
+        // $title="Add User";
+        // $data = compact('title');
+        return view('adminLayouts/addUserForm'); //->with($data);
+    }
+
+    public function addUserHandler(Request $request){
+        
+        $request->validate(
+            [
+                'First_Name'=>'required',
+                'Last_Name'=> 'required',
+                'Email'=>'required | email',
+                'Password'=> 'required',
+                'Phone_Number'=> 'required | min:10| numeric'
+
+            ]
+            );
+        $user = new User;
+        $user->fname= $request['First_Name'];
+        $user->lname= $request['Last_Name'];
+        $user->email= $request['Email'];
+        $user->password=$request['Password'];
+        $user->phone = $request['Phone_Number'];
+        $user->status = "Inactive";
+        // $user->role= $request['user_role'];
+        $user->save();
+
+        return redirect("/manage-users");
+    }
+
 
 }
