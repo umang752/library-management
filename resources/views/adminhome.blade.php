@@ -20,7 +20,7 @@
             <h2>Welcome, Admin {{Auth::user()->fname}}!</h2>
             <div class="row mt-4">
                 <div class="col-md-4">
-                    <a  class="btn btn-primary btn-lg btn-block">Manage Users</a>
+                    <a href="{{route('admin.manage_user')}}" class="btn btn-primary btn-lg btn-block">Manage Users</a>
                 </div>
                 <div class="col-md-4">
                     <a  class="btn btn-success btn-lg btn-block">Manage Books</a>

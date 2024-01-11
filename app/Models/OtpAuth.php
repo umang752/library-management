@@ -16,7 +16,7 @@ class OtpAuth extends Model
         'otp',
     ];
     
-    // If 'otp_id' is different from the default 'id' primary key
+    
     protected $primaryKey = 'otp_id';
     
     public $timestamps = true;

@@ -17,13 +17,16 @@ class LoginController extends Controller
     $user = User::where('email', $email)->first();
     if ($user) {
 
-        if ($password==$user->password) {
+        if ($password && $password==$user->password) {
             Auth::login($user); 
             if($user->type=='admin'){
                 return redirect('/adminhome');
             }
             else{return redirect('/home');}
             
+        }
+        else{
+            return redirect()->back();
         }
     }
     else{

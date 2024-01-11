@@ -17,7 +17,7 @@ class CheckUserType
     public function handle($request, Closure $next, $type)
     {
         if (Auth::user() && Auth::user()->type !== $type) {
-            return redirect('/'); // Redirect unauthorized users
+            return redirect('/');
         }
     
         return $next($request);

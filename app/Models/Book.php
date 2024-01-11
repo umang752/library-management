@@ -9,9 +9,9 @@ class Book extends Model
 {
     use HasFactory;
     
-    protected $table = 'books'; // Specify the table name
+    protected $table = 'books'; 
 
-    protected $primaryKey = 'book_id'; // Specify the primary key
+    protected $primaryKey = 'book_id'; 
 
     protected $fillable = [
         'name',

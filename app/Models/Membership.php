@@ -8,9 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 class Membership extends Model
 {
     use HasFactory;
-    protected $table = 'memberships'; // Specify the table name
+    protected $table = 'memberships'; 
 
-    protected $primaryKey = 'membership_id'; // Specify the primary key
+    protected $primaryKey = 'membership_id'; 
 
     protected $fillable = [
         'user_id',

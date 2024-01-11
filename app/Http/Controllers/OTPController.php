@@ -12,7 +12,7 @@ use App\Models\OtpAuth;
 
 class OTPController extends Controller
 {
-    public function subscribe(Request $request) 
+    public function resetpass(Request $request) 
     {
         $email = $request->input('email');
         $user = User::where('email', $email)->first();
@@ -22,11 +22,11 @@ class OTPController extends Controller
 
             $otp_temp = OtpAuth::create([
                 'email' => $email,
-                'otp' => $otp, // Save OTP to the database
+                'otp' => $otp,
             ]);
 
             if ($otp_temp) {
-                // Send OTP via email
+              
                 Mail::to($email)->send(new OTPMail($otp));
 
                 return new JsonResponse(
@@ -40,7 +40,6 @@ class OTPController extends Controller
         } else {
             return redirect()->back()->with('alert', 'USER ALREADY EXISTS LOGIN!!');
 
-            // Logic if the user is not found
         }
     }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\ManageUserController;
 use App\Http\Middleware\CheckUserType;
+use App\Http\Middleware\OTPController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -17,7 +18,7 @@ use App\Http\Middleware\CheckUserType;
 */
 
 Route::group(['middleware' => 'checkUserType:admin'], function () {
-    // Admin routes here
+   
 
 
     Route::get('/adminhome', function () {
@@ -34,13 +35,13 @@ Route::get('/adminhome/manage_user/add_user', [ManageUserController::class, 'sho
 
 Route::post('/adminhome/manage_user/add_user', [ManageUserController::class, 'addUser'])->name('admin.add_user');
 
-Route::get('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'showUpdateUserForm'])->name('admin.update_user_view');
+Route::get('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'showUpdateUserForm'])->name('admin.update_user');
 Route::post('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'updateUser'])->name('admin.update_user');
 
 
 });
 Route::group(['middleware' => 'checkUserType:student'], function () {
-    // Student routes here
+   
     Route::get('/home', function () {
         return view('home');
     })->name('home');
@@ -50,7 +51,9 @@ Route::group(['middleware' => 'checkUserType:student'], function () {
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('/');
+
+
 
 Route::get('/login', function () {
     return view('login');
@@ -60,20 +63,20 @@ Route::get('/register', function () {
     return view('register');
 })->name('register');
 
-
+Route::get('/forgotpass', function () {
+    return view('forgotpass');
+})->name('forgotpass');
 
 
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
-// Route::get('/password/reset', function () {
-    
-// })->name('password.request');
 
 
 Route::post('/register', [RegisterController::class, 'register']);
 
 
+Route::post('/forgotpass', [OTPController::class, 'resetpass'])->name('forgotpass');
 // Route::get('/password/reset', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset');
 // Define other necessary routes for authentication
 // Route::get('/admin', [AdminController::class, 'index'])->name('admin.home');
