@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+   <style>.cls table, th, td {
+  border:1px solid white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="contain">
+        <div class="text">
+        <h1>Manage Book</h1><br>
+        <div >
+        <button id="add" type="button" onclick="window.location.href='/addbook'">AddBook</button>
+
+        <!-- <a href="/addbook" class="button">Add Book</a> -->
+        <!-- <a href="/signup" class="button">Edit</a>
+        <a href="/login" class="button">Logout</a> -->
+
+    </div>
+        <form id="form" action="/edit" method="post" > 
+  
+  <table style="width: 100%">
+        @csrf
+       
+               
+                <tr>
+                   
+                <th>name</th>
+                <th>description</th>
+                <th>author</th>
+                <th>photo</th>
+                <th>status</th>
+                <th>issued_copies</th>
+                <th>total_inventory</th>
+                <th>price</th>
+                <!-- <button type="submit" id="bt">edit</button> -->
+</tr>
+
+
+                    <!-- <tr>
+                        <td>name</td>
+                        <td>title</td>
+                        <td>description</td>
+                        <p>Hello, </p>
+                        <td>
+                            <a href="/edit" class="edit-button">Edit</a>
+                            <a href="/delete" class="delete-button">Delete</a>
+                        </td>
+                    </tr>
+                     -->
+</table>
+</form>
+
+</div>
+        </div>
+</body>
+
+</html>
+
+
+
+
+
+<style>
+    * {
+        margin: 0%;
+        padding: 0%;
+    }
+     h1{
+        color:white;
+     }
+    body {
+        background-color: black;
+        background-size: 100% 740px;
+    }
+
+   tr{
+        padding-top: 10px;
+        padding-left: 40%;
+        width: 20px;
+        height: 30px;
+        text-align: center;
+        color: white;
+
+
+
+    }
+
+    .contain.text {
+        position: relative;
+        top: 7%;
+    }
+
+    .cls {
+
+        border: 3px solid white;
+        background-color: black;
+
+        width: 250px;
+        font-size: 20px;
+        margin-top: 30px;
+        color: white;
+        height: 40px;
+        padding-left: 10px;
+    }
+
+   
+    .text button {
+        width: 100px;
+        height: 10px;
+        background-color: blue;
+        color: black;
+        border: white;
+        font-size: 22px;
+        /* border-radius: 25px; */
+        margin-top: 20px;
+
+
+    }
+
+    button:hover {
+
+        color: white;
+        font-size: 20px;
+        background-color: black;
+        cursor: pointer;
+    }
+
+    p span {
+        border: 3px solid black;
+        align-content: right;
+        color: white;
+    }
+    .edit-button, .delete-button {
+    display: inline-block;
+    padding: 5px 10px;
+    margin-right: 5px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.delete-button {
+    background-color: #FF3547;
+}
+#add{
+    
+  background-color: blue;
+  border: none;
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 12px;
+  margin: 4px 2px ;
+  cursor: pointer;
+ 
+}
+
+
+
+
+
+</style>

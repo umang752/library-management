@@ -19,8 +19,10 @@ class LoginController extends Controller
         'password' => ['required'],
     ]);
     $credentials['status'] = 'active';
+    // $credentials['user_role'] = 'admin';
     if (Auth::attempt($credentials)) {
-        return redirect()->intended('/dashboard');
+
+        return redirect()->intended('/example-page');
     }
 
    return back()->withErrors([

@@ -14,20 +14,23 @@ class RegisterController extends Controller
     {
         $input = $request->all();
        try {
-            $validator = Validator::make($request->all(), [
+        $rules =[
                 'fname' => 'required|alpha|max:30',
                 'lname' => 'required|alpha|max:20',
                 'phone' => 'required|numeric|digits:10',
                 'email' => 'required|email|unique:users|max:50',
                 'status' => 'required|alpha|max:20',
                 'password' => 'required|min:8',
-                 ]);
-                 
+                 ];
+                 $validator = Validator::make($request->all(), $rules);
             if ($validator->fails()) {
-                return response()->json([
-                    'status' => 400,
-                    'message' => 'Invalid Details'
-                ], 400);
+                // return back()->withErrors([
+                //     'email' => 'The provided credentials do not match our records or the account is not active.',
+                // ])->onlyInput('email');
+                return redirect()->back()
+                ->withErrors($validator)
+                ->withInput($request->input());
+
             } else {
                 $user = new User;
                 $user->first_name = $input['fname'];

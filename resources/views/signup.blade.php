@@ -55,26 +55,61 @@
     .login-btn:hover {
       background-color: #2980b9;
     }
+    .error-message{
+      color:red;
+      font-size: smaller;
+    }
   </style>
 </head>
 <body>
-  <form action="/register" method="post">
+  <form action="/register" method="post" >
     @csrf
+    <div>
     <label for="fname">First Name:</label>
     <input type="text" id="fname" name="fname" required>
-
+    <div class="error-message" class="alert alert-danger">
+    @error('fname')
+            <span>{{ $message }}</span>
+        @enderror
+  </div>
+  </div>
+  <div>
     <label for="lname">Last Name:</label>
     <input type="text" id="lname" name="lname" required>
-
+    <div class="error-message" class="alert alert-danger">
+    @error('lname')
+            <span>{{ $message }}</span>
+        @enderror
+  </div>
+  </div>
+  <div>
     <label for="email">Email:</label>
     <input type="email" id="email" name="email" required>
-
+    <div class="error-message" class="alert alert-danger">
+    @error('email')
+            <span>{{ $message }}</span>
+        @enderror
+  </div>
+  </div>
+  <div>
     <label for="password">Password:</label>
     <input type="password" id="password" name="password" required>
-
+    <div class="error-message" class="alert alert-danger">
+    @error('password')
+            <span>{{ $message }}</span>
+        @enderror
+    </div>
+  </div>
+  <div>
     <label for="phone">Phone:</label>
     <input type="tel" id="phone" name="phone" required>
-
+    <div class="error-message" class="alert alert-danger">
+    @error('phone')
+            <span>{{ $message }}</span>
+        @enderror
+  </div>
+  </div>
+  
     <label for="status">Status:</label>
     <select id="status" name="status" required>
       <option value="active">Active</option>
@@ -85,4 +120,15 @@
     <button type="button" class="login-btn" onclick="window.location.href='/login'">Login</button>
   </form>
 </body>
+<!-- <script>
+    window.onload = function() {
+        setTimeout(function() {
+            var errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.style.display = 'none';
+            }
+        }, 5000);
+    };
+</script> -->
+
 </html>

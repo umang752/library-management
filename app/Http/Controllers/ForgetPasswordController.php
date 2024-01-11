@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Http\Request;
 use App\Mail\SendOtpMail;
 use Illuminate\Support\Facades\Mail;
@@ -18,32 +19,43 @@ class ForgetPasswordController extends Controller
         return view('forgot-password');
     }
 
-    public function sendOtp(Request $request)
+    public function resetPassword(Request $request)
     {
       
-        $email = $request->input('email');
-        $user = User::where('email', $email)->first();
+       dd("hiiii");
+        $input = $request->all();
+     
+        $rules =[
+                
+                'email' => 'required|email|unique:users|max:50',
+                'newpassword' => 'required|min:8',
+                 ];
+                 $validator = Validator::make($request->all(), $rules);
+             if ($validator->fails()) {
+               return redirect()->back()
+                ->withErrors($validator)
+                ->withInput($request->input());
 
-        if ($user) {
-            
-            // Generate and save OTP
-            // $otp = rand(100000, 999999);
-            // $user->update(['otp' => $otp]);
+            } else {
+                $email = $request->input('email');
+                $newPassword = $request->input('newpassword');
+        
+            $user = User::where('email', $email)->first();
 
-            // // Send OTP to user's email
-            // Mail::to($email)->send(new SendOtpMail($otp));
+ 
+    if ($user) {
+  
+    $hashedPassword = Hash::make($newPassword);
 
-            // // Redirect to password reset page with email
-            return redirect('/password-reset/'.$email)->with('success', 'OTP sent successfully.');
-        }
-        dd("email");
-        session(['error' => [
-            'message' => 'Email not found.',
-            'expires' => now()->addSeconds(5),
-        ]]);
-
-        return back();
     
-        // return back()->with('error', 'Email not found.');
+    $user->password = $hashedPassword;
+    $user->save();
+
+    return redirect('/login');
+} else {
+    echo "User not found";
+}
+       
     }
 }
+    }

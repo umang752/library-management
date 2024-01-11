@@ -118,6 +118,9 @@
             color: #4caf50;
             margin-right: 10px;
         }
+        #error-message{
+          color:red;
+        }
     </style>
 </head>
 <body>
@@ -147,8 +150,26 @@
             
         </div>
         
-        
+        @if ($errors->any())
+    <div id="error-message" class="alert alert-danger">
+        @foreach ($errors->all() as $error)
+            <p>{{ $error }}</p>
+        @endforeach
+    </div>
+@endif
+
     </form>
 
 </body>
+<script>
+    window.onload = function() {
+        setTimeout(function() {
+            var errorMessage = document.getElementById('error-message');
+            if (errorMessage) {
+                errorMessage.style.display = 'none';
+            }
+        }, 5000);
+    };
+</script>
+
 </html>

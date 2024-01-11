@@ -98,13 +98,13 @@ textarea {
         </select>
 
         <label for="price">Price:</label>
-        <input type="number" id="price" name="price" step="100" required>
+        <input  id="price" name="price" value="0" required>
 
         <label for="issued_copies">Issued Copies</label>
-        <input type="number" id="issued_copies" name="issued_copies">
+        <input id="issued_copies" name="issued_copies" value="0">
 
         <label for="total_inventory">Total Inventory</label>
-        <input type="number" id="total_inventory" name="total_inventory">
+        <input  id="total_inventory" name="total_inventory" value="10">
 
         <label for="photo">Photo</label>
         <input type="file" id="photo" name="photo" accept="image/*">
