@@ -15,8 +15,6 @@ class AdminPageController extends Controller
                 return view("adminPage");
             }
         }
-        // else{
             return redirect("/login");
-        // }
     }
 }

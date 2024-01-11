@@ -17,7 +17,7 @@
 <!-- Your regular content here -->
 
 <body>
-<form action="/manage-users/addUserHandler" method="post">
+<form action="/manage-users/updateUserHandler" method="post">
   @csrf   
   <x-Heading headingName="Add User" />
   <div class="container">
@@ -28,7 +28,7 @@
     <!-- <x-Input type="password" name="Confirm_Password" value="" /> -->
     <x-Input type="text" name="Phone_Number"  />
     
-    <button type="submit" class="btn btn-primary">Submit</button>
+    <button type="submit" class="btn btn-primary">ADD</button>
     <!-- <x-Links linkUrl="/login" label="Login" /> -->
   </div>
 </form>

@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>
-      {{$title}}
+        Update User
       </title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
 </head>
@@ -19,42 +19,61 @@
         print_r($errors->all());
         @endphp
     </pre> -->
-<form action="{{ url('/') }}/register" method="post">
+<form action="/manage-users/updateHandler" method="post">
   @csrf
   
-  <!-- @php
-  $demo =5;
-  @endphp -->
-    $lname1 ="";
-    $email1 ="";
-    $fname1 ="";
-    $phone1 ="";
-    $status1="";
-  @if(isset($user)){
-    $fname1 =$user->fname ;
-    $lname1 =$user->lname;
-    $email1 =$user->email ;
-    $phone1 =$user->phone ;
-    $status1=$user->status ;
-  }
-  @endif
-  <x-Heading headingName="{{$title}}" />
-  <div class="container">
-    <x-Input type="text" name="First_Name" value="{{$fname1}}" />
-    <x-Input type="text" name="Last_Name" value="{{$lname1}}" />
-    <x-Input type="email" name="Email" value="{{$email1}}" />
-    <x-Input type="password" name="Password" value="" />
-    <x-Input type="password" name="Confirm_Password" value="" />
-    <x-Input type="text" name="Phone_Number" value="{{$phone1}}" />
-    <button type="submit" class="btn btn-primary">Submit</button>
-    <x-Links linkUrl="/login" label="Login" />
-  </div>
+  <x-Heading headingName="Update User" />
+
+  <input type="number" class="d-none" name="id" value="{{$id}}">
+  <div class="form-group">
+    <label for="exampleInputEmail1">First_Name</label>
+    <input type="text" class="form-control" id="exampleInputName1" aria-describedby="emailHelp" placeholder="Enter First_Name" name="First_Name" value="{{$user->fname}}">
+    <span id="emailHelp" class="text-danger">
+        @error('First_Name')
+            {{ $message }}  
+        @enderror
+    </span>
+</div>
+<div class="form-group">
+    <label for="exampleInputEmail1">Last_Name</label>
+    <input type="text" class="form-control" id="exampleInputName1" aria-describedby="emailHelp" placeholder="Enter Last_Name" name="Last_Name" value="{{ $user->lname }}">
+    <span id="emailHelp" class="text-danger">
+        @error('Last_Name')
+            {{ $message }}  
+        @enderror
+    </span>
+</div>
+<div class="form-group">
+    <label for="exampleInputEmail1">Email</label>
+    <input type="email" class="form-control" id="exampleInputName1" aria-describedby="emailHelp" placeholder="Enter Email" name="Email" value="{{ $user->email }}">
+    <span id="emailHelp" class="text-danger">
+        @error('Email')
+            {{ $message }}  
+        @enderror
+    </span>
+</div>
+<!-- <div class="form-group">
+    <label for="exampleInputEmail1">Password</label>
+    <input type="password" class="form-control" id="exampleInputName1" aria-describedby="emailHelp" placeholder="Enter Password" name="Password" value="">
+    <span id="emailHelp" class="text-danger">
+        @error('Password')
+            {{ $message }}  
+        @enderror
+    </span>
+</div> -->
+<div class="form-group">
+    <label for="exampleInputEmail1">Phone_Number</label>
+    <input type="text" class="form-control" id="exampleInputName1" aria-describedby="emailHelp" placeholder="Enter Phone_Number" name="Phone_Number" value="{{ $user->phone }}">
+    <span id="emailHelp" class="text-danger">
+        @error('Phone_Number')
+            {{ $message }}  
+        @enderror
+    </span>
+</div>
+
+<button type="submit" class="btn btn-primary">Submit</button>
+
+</div>
 </form>
 </body>
-<!-- @if($title !== 'Sign Up Page')
-    <script>
-        // Redirect to the URL in a new tab using JavaScript
-        window.open('{{ url()->current() }}', '_blank');
-    </script>
-@endif -->
 </html>

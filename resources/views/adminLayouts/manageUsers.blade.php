@@ -34,7 +34,7 @@
                 <td>{{$user->User_Role}}</td>
                 <td>
                     <a href="/manage-users/delete/{{$user->user_id}}"><button class="btn btn-danger ">Delete</button></a>
-                    <a href="{{route('edit.user',['id'=>$user->user_id])}}"><button class="btn btn-success">Update</button></a>
+                    <a href="/manage-users/update/{{$user->user_id}}"><button class="btn btn-success">Update</button></a>
                 </td>
             </tr>
             @endforeach

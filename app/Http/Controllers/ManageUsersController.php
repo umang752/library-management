@@ -24,16 +24,26 @@ class ManageUsersController extends Controller
         return redirect()->back();
     }
 
-    public function editUser($id){
+    public function updateUser($id){
         $user = User::find($id);
         if(is_null($user)){
             return redirect('/manage-users');
         }
         else{
-            $title="Update User";
-            $data = compact('title','user');
-            return view('registrationForm')->with($data);
+            $data = compact('user','id');
+            return view('adminLayouts/updateUserForm')->with($data);
         }
+    }
+    public function updateUserHandler( Request $request){
+        $id1 = $request['id'];
+        $user = User::where('user_id', $id1)->first();
+        $user->fname= $request['First_Name'];
+        $user->lname= $request['Last_Name'];
+        $user->email= $request['Email'];
+        $user->phone = $request['Phone_Number'];
+        // $user->role= $request['user_role'];
+        $user->save();
+        return redirect('/manage-users');
     }
     public function addUser(){
         // $title="Add User";
