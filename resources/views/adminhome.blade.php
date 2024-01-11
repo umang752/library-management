@@ -17,7 +17,7 @@
 
     <div class="container mt-5">
         <div class="text-center">
-            <h2>Welcome, Admin!</h2>
+            <h2>Welcome, Admin {{Auth::user()->fname}}!</h2>
             <div class="row mt-4">
                 <div class="col-md-4">
                     <a  class="btn btn-primary btn-lg btn-block">Manage Users</a>

@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\ManageUserController;
+use App\Http\Middleware\CheckUserType;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -14,13 +16,36 @@ use App\Http\Controllers\LoginController;
 |
 */
 
-Route::group(['middleware' => 'checkusertype:admin'], function () {
+Route::group(['middleware' => 'checkUserType:admin'], function () {
     // Admin routes here
+
+
+    Route::get('/adminhome', function () {
+        return view('adminhome');
+    })->name('adminhome');
+    
+
+Route::get('/adminhome/manageuser', [ManageUserController::class, 'index'])->name('admin.manage_user');
+
+Route::get('/adminhome/manageuser/delete/{id}', [ManageUserController::class, 'deleteUser'])->name('admin.delete_user');
+
+
+Route::get('/adminhome/manage_user/add_user', [ManageUserController::class, 'showAddUserForm'])->name('admin.add_user');
+
+Route::post('/adminhome/manage_user/add_user', [ManageUserController::class, 'addUser'])->name('admin.add_user');
+
+Route::get('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'showUpdateUserForm'])->name('admin.update_user_view');
+Route::post('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'updateUser'])->name('admin.update_user');
+
+
+});
+Route::group(['middleware' => 'checkUserType:student'], function () {
+    // Student routes here
+    Route::get('/home', function () {
+        return view('home');
+    })->name('home');
 });
 
-Route::group(['middleware' => 'checkusertype:student'], function () {
-    // Student routes here
-});
 
 
 Route::get('/', function () {
@@ -35,13 +60,8 @@ Route::get('/register', function () {
     return view('register');
 })->name('register');
 
-Route::get('/home', function () {
-    return view('home');
-})->name('home');
 
-Route::get('/adminhome', function () {
-    return view('adminhome');
-})->name('adminhome');
+
 
 Route::post('/login', [LoginController::class, 'login']);
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');

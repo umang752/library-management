@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+
+
 class RegisterController extends Controller
 {
     public function register(Request $request){
@@ -11,7 +14,7 @@ class RegisterController extends Controller
         $check2 = User::where('email', $check)->first();
         if($check2){
             
-            return redirect()->back()->with('alert', 'USER ALREADY EXISTS LOGIN!!');
+            return redirect('login')->with('alert', 'USER ALREADY EXISTS LOGIN!!');
 
         }
         else{
@@ -19,8 +22,8 @@ class RegisterController extends Controller
         
         $request->validate(
             [
-                'firstname'=>'required',
-                'lastname'=> 'required',
+                'firstname'=>'required | alpha',
+                'lastname'=> 'required | alpha',
                 'email'=>'required | email',
                 'password'=> 'required',
                 'confirm_password'=>'required | same:password',
@@ -36,10 +39,16 @@ class RegisterController extends Controller
         $user->email= $request['email'];
         $user->password=$request['password'];
         $user->phone = $request['phone'];
-        $user->status = "Inactive";
+        $user->status = "active";
         $user->type = "student";
         $user->save();
-        return redirect('home');
+
+        Auth::login($user); 
+        if($user->type=='admin'){
+            return redirect('/adminhome');
+        }
+        else{return redirect('/home');}
+        
         }
     }
     //

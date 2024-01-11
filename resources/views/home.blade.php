@@ -11,9 +11,15 @@
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header">hOME</div>
+                    <div class="card-header">Student Home Page</div>
                     <div class="card-body">
-                        WELCOME TO THE HOME PAGE
+                        <p>Welcome {{Auth::user()->fname}}  to the home page</p>
+                        
+                        <!-- Logout Button -->
+                        <form action="{{ route('logout') }}" method="post">
+                            @csrf
+                            <button type="submit" class="btn btn-danger">Logout</button>
+                        </form>
                     </div>
                 </div>
             </div>

@@ -19,11 +19,15 @@ class LoginController extends Controller
 
         if ($password==$user->password) {
             Auth::login($user); 
-            return redirect('/home');
+            if($user->type=='admin'){
+                return redirect('/adminhome');
+            }
+            else{return redirect('/home');}
+            
         }
     }
     else{
-        return redirect()->back()->with('alert', 'USER DOESNT EXIST SIGNUP!!');
+        return redirect('register')->with('alert', 'USER DOESNT EXIST SIGNUP!!');
     }
    }
 
