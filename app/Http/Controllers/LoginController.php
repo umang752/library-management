@@ -10,6 +10,18 @@ use Illuminate\Support\Facades\Auth;
 class LoginController extends Controller
 {
 
+    public function showlogin()
+    {
+        if(Auth::user()){
+            return redirect('/notfound');
+        }
+        else{
+            return view('login');
+        }
+        
+    }
+
+
     public function login(Request $req){
     $email = $req->input('email');
     $password = $req->input('password');
@@ -26,7 +38,7 @@ class LoginController extends Controller
             
         }
         else{
-            return redirect()->back();
+            return redirect()->back()->with('alert', 'credentials wrong!!');;
         }
     }
     else{
@@ -42,6 +54,6 @@ class LoginController extends Controller
 
         $req->session()->regenerateToken();
 
-        return redirect('/');
+        return redirect('/')->with('alert', 'user logged out!!');
     }
 }

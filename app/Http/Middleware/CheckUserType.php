@@ -18,7 +18,7 @@ class CheckUserType
     {
         
         if (Auth::user() && Auth::user()->type !== $type) {
-            return redirect('/');
+            return redirect('/notfound');
         }
     
         return $next($request);

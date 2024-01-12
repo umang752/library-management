@@ -8,6 +8,18 @@ use Illuminate\Support\Facades\Auth;
 
 class RegisterController extends Controller
 {
+    public function showregister()
+    {
+        if(Auth::user()){
+            return redirect('/notfound');
+        }
+        else{
+            return view('register');
+        }
+        
+    }
+
+
     public function register(Request $request)
     {
         // Check if the email already exists

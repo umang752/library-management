@@ -81,22 +81,5 @@ class ManageUserController extends Controller
         return redirect('/admin/user');
 
 
-        // $user = User::findOrFail($id);
-
-        // $validatedData = $request->validate([
-        //     'firstname' => 'required|string|max:255',
-        //     'lastname' => 'required|string|max:255',
-        //     'email' => 'required|email|unique:users,email,',
-        //     'password' => 'required',
-        //     'phone' => 'required|numeric',
-        // ]);
-
-        // $user->fname = $validatedData->input('firstname');
-        // $user->lname = $validatedData->input('lastname');
-        // $user->password = $validatedData->input('password');
-        // $user->phone = $validatedData->input('phone');
-        // $user->save();
-
-        return redirect('admin/user');
     }
 }

@@ -11,7 +11,7 @@
 <body>
     <div class="container mt-5">
         <h1>Add Book</h1>
-        <form method="POST" enctype="multipart/form-data">
+        <form method="POST" action="{{ url('admin/book/add') }}"  enctype="multipart/form-data">
             @csrf
             <div class="form-group">
                 <label for="name">Name</label>

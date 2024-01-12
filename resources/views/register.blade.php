@@ -7,22 +7,18 @@
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-@if ($errors->any())
-    <div class="alert alert-danger">
-        <ul>
-            @foreach ($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
+@if(session('alert'))
+        <div class="alert alert-danger">
+            {{ session('alert') }}
+        </div>
+    @endif
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">Sign Up</div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('register') }}">
+                        <form method="POST" action="{{ url('/register') }}">
                             @csrf
                             <div class="form-group">
                                 <label for="firstname">First Name</label>
@@ -46,11 +42,11 @@
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone No.</label>
-                                <input id="phone" type="tel" class="form-control" name="phone" required>
+                                <input id="phone" type="number " minlength="10" class="form-control" name="phone" required>
                             </div>
                             <button type="submit" class="btn btn-primary">Sign Up</button>
                         </form>
-                        <a href="{{ route('login') }}" class="btn btn-link">Already have an account? Login</a>
+                        <a href="{{ url('/login') }}" class="btn btn-link">Already have an account? Login</a>
                     </div>
                 </div>
             </div>

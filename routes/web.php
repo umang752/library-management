@@ -6,6 +6,8 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\ManageUserController;
 use App\Http\Controllers\ManageBookController;
 use App\Http\Controllers\ManageIssueController;
+use App\Http\Controllers\HomeController;
+use App\Http\Controllers\AdminController;
 use App\Http\Middleware\CheckUserType;
 // use App\Http\Middleware\OTPController;
 /*
@@ -22,10 +24,8 @@ use App\Http\Middleware\CheckUserType;
 
 Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], function () {
 
-    Route::get('/', function () {
-        return view('admin');
-    })->name('admin');
-
+    
+    Route::get('/', [AdminController::class, 'showadmin']);
     
 
     Route::group(['prefix' => '/user'], function () {
@@ -68,34 +68,14 @@ Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], funct
 });
 
 
-// Route::group(['middleware' => 'checkUserType:admin'], function () {
-   
 
-
-//     Route::get('/adminhome', function () {
-//         return view('adminhome');
-//     })->name('adminhome');
-    
-
-// Route::get('/adminhome/manage-user', [ManageUserController::class, 'index']);
-
-// Route::get('/adminhome/manage-user/delete/{id?}', [ManageUserController::class, 'deleteUser']);
-
-
-// Route::get('/adminhome/manage-user/add_user', [ManageUserController::class, 'showAddUserForm']);
-
-// Route::post('/adminhome/manage-user/add_user', [ManageUserController::class, 'addUser']);
-
-// Route::get('/adminhome/manage-user/update/{id?}', [ManageUserController::class, 'showUpdateUserForm']);
-// Route::post('/adminhome/manage-user/update/{id?}', [ManageUserController::class, 'updateUser']);
-
-
-// });
 Route::group(['middleware' => 'checkUserType:student'], function () {
    
-    Route::get('/home', function () {
-        return view('home');
-    })->name('home');
+    // Route::get('/home', function () {
+    //     return view('home');
+    // })->name('home');
+
+    Route::get('/home', [HomeController::class, 'showhome']);
 });
 
 
@@ -105,14 +85,20 @@ Route::get('/', function () {
 })->name('/');
 
 
+Route::get('/notfound', function () {
+    return view('notfound');
+});
 
-Route::get('/login', function () {
-    return view('login');
-})->name('login');
+Route::get('/login', [LoginController::class, 'showlogin']);
 
-Route::get('/register', function () {
-    return view('register');
-})->name('register');
+Route::get('/register', [RegisterController::class, 'showregister']);
+// Route::get('/login', function () {
+//     return view('login');
+// })->name('login');
+
+// Route::get('/register', function () {
+//     return view('register');
+// })->name('register');
 
 Route::get('/forgotpass', function () {
     return view('forgotpass');
@@ -127,10 +113,3 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::post('/register', [RegisterController::class, 'register']);
 
 
-// Route::post('/forgotpass', [OTPController::class, 'resetpass']);
-// Route::get('/password/reset', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset');
-// Define other necessary routes for authentication
-// Route::get('/admin', [AdminController::class, 'index'])->name('admin.home');
-// Route::get('/manage/users', [AdminController::class, 'manageUsers'])->name('manage.users');
-// Route::get('/manage/books', [AdminController::class, 'manageBooks'])->name('manage.books');
-// Route::get('/manage/issue-books', [AdminController::class, 'manageIssueBooks'])->name('manage.issue.books');
