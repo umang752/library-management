@@ -20,7 +20,7 @@ class LoginController extends Controller
         if ($password && $password==$user->password) {
             Auth::login($user); 
             if($user->type=='admin'){
-                return redirect('/adminhome');
+                return redirect('/admin');
             }
             else{return redirect('/home');}
             
@@ -30,7 +30,7 @@ class LoginController extends Controller
         }
     }
     else{
-        return redirect('register')->with('alert', 'USER DOESNT EXIST SIGNUP!!');
+        return redirect('/register')->with('alert', 'USER DOESNT EXIST SIGNUP!!');
     }
    }
 

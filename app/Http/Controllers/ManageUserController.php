@@ -7,17 +7,21 @@ use App\Models\User;
 
 class ManageUserController extends Controller
 {
-    public function showAddUserForm()
+    public function showAddUser()
     {
-        return view('admin.add_user'); 
+        
+        return view('admin.user.add');
     }
 
     public function index()
     {
         $users = User::all();
+       
 
-        return view('admin.manage_user', compact('users'));
+        $data = compact('users');
+        return view('admin.user.index')->with($data);
     }
+
     public function deleteUser($id)
     {
         $user = User::find($id);
@@ -45,42 +49,54 @@ class ManageUserController extends Controller
             'fname' => $validatedData['firstname'],
             'lname' => $validatedData['lastname'],
             'email' => $validatedData['email'],
-            'password' => $validatedData['password'], 
+            'password' => $validatedData['password'],
             'phone' => $validatedData['phone'],
-            'status'=>'active',
-            'type'=>'student',
+            'status' => 'inactive',
+            'type' => 'student',
         ]);
 
-       
-        return redirect('/adminhome/manageuser');
+        return redirect('admin/user');
     }
 
     public function showUpdateUserForm($id)
     {
-        $user = User::findOrFail($id); 
-        return view('admin.update_user', compact('user')); 
+        $user = User::findOrFail($id);
+        return view('admin.user.update', compact('user'));
     }
 
-    
-    public function updateUser(Request $request, $id)
-    {
-        $user = User::findOrFail($id); 
+    public function updateUser(Request $request)
+    {   
+        $id1 = $request['id'];
+        $user = User::where('user_id', $id1)->first();
 
-        $validatedData = $request->validate([
-            'firstname' => 'required|string|max:255',
-            'lastname' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required',
-            'phone' => 'required|numeric',
-        ]);
-        
-        $user->fname = $request->input('firstname');
-        $user->lname = $request->input('lastname');
-        $user->password = $request->input('password'); 
-        $user->phone = $request->input('phone');
+        $user->fname= $request['firstname'];
+        $user->lname= $request['lastname'];
+        if($request['password']){
+            $user->password= $request['password'];
+        }
+        $user->phone = $request['phone'];
+        // $user->role= $request['user_role'];  
+
         $user->save();
+        return redirect('/admin/user');
 
-        
-        return redirect('/adminhome/manageuser');
+
+        // $user = User::findOrFail($id);
+
+        // $validatedData = $request->validate([
+        //     'firstname' => 'required|string|max:255',
+        //     'lastname' => 'required|string|max:255',
+        //     'email' => 'required|email|unique:users,email,',
+        //     'password' => 'required',
+        //     'phone' => 'required|numeric',
+        // ]);
+
+        // $user->fname = $validatedData->input('firstname');
+        // $user->lname = $validatedData->input('lastname');
+        // $user->password = $validatedData->input('password');
+        // $user->phone = $validatedData->input('phone');
+        // $user->save();
+
+        return redirect('admin/user');
     }
 }

@@ -1,11 +1,13 @@
 <?php
-
+  
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\ManageUserController;
+use App\Http\Controllers\ManageBookController;
+use App\Http\Controllers\ManageIssueController;
 use App\Http\Middleware\CheckUserType;
-use App\Http\Middleware\OTPController;
+// use App\Http\Middleware\OTPController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -17,29 +19,78 @@ use App\Http\Middleware\OTPController;
 |
 */
 
-Route::group(['middleware' => 'checkUserType:admin'], function () {
-   
 
+Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], function () {
 
-    Route::get('/adminhome', function () {
-        return view('adminhome');
-    })->name('adminhome');
+    Route::get('/', function () {
+        return view('admin');
+    })->name('admin');
+
     
 
-Route::get('/adminhome/manageuser', [ManageUserController::class, 'index'])->name('admin.manage_user');
+    Route::group(['prefix' => '/user'], function () {
+        Route::get('/', [ManageUserController::class, 'index']);
 
-Route::get('/adminhome/manageuser/delete/{id}', [ManageUserController::class, 'deleteUser'])->name('admin.delete_user');
+        Route::get('delete/{id?}', [ManageUserController::class, 'deleteUser']);
 
+        Route::get('add', [ManageUserController::class, 'showAddUser']);
+        Route::post('add', [ManageUserController::class, 'addUser']);
 
-Route::get('/adminhome/manage_user/add_user', [ManageUserController::class, 'showAddUserForm'])->name('admin.add_user');
+        Route::get('update/{id?}', [ManageUserController::class, 'showUpdateUserForm']);
+        Route::post('update/{id?}', [ManageUserController::class, 'updateUser']);
+    });
 
-Route::post('/adminhome/manage_user/add_user', [ManageUserController::class, 'addUser'])->name('admin.add_user');
+    Route::group(['prefix' => '/book'], function () {
+        Route::get('/', [ManageBookController::class, 'index']);
 
-Route::get('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'showUpdateUserForm'])->name('admin.update_user');
-Route::post('/adminhome/manage_user/update/{id}', [ManageUserController::class, 'updateUser'])->name('admin.update_user');
+        Route::get('delete/{id?}', [ManageBookController::class, 'deleteBook']);
+
+        Route::get('add', [ManageBookController::class, 'showAddBook']);
+        Route::post('add', [ManageBookController::class, 'addBook']);
+
+        Route::get('update/{id?}', [ManageBookController::class, 'showUpdateBookForm']);
+        Route::post('update/{id?}', [ManageBookController::class, 'updateBook']);
+    });
+
+    Route::group(['prefix' => '/issue'], function () {
+        Route::get('/', [ManageIssueController::class, 'index']);
+
+        // Route::get('delete/{id?}', [ManageBookController::class, 'deleteBook']);
+
+        // Route::get('add', [ManageBookController::class, 'showAddBook']);
+        // Route::post('add', [ManageBookController::class, 'addBook']);
+
+        // Route::get('update/{id?}', [ManageBookController::class, 'showUpdateBookForm']);
+        // Route::post('update/{id?}', [ManageBookController::class, 'updateBook']);
+    });
 
 
 });
+
+
+// Route::group(['middleware' => 'checkUserType:admin'], function () {
+   
+
+
+//     Route::get('/adminhome', function () {
+//         return view('adminhome');
+//     })->name('adminhome');
+    
+
+// Route::get('/adminhome/manage-user', [ManageUserController::class, 'index']);
+
+// Route::get('/adminhome/manage-user/delete/{id?}', [ManageUserController::class, 'deleteUser']);
+
+
+// Route::get('/adminhome/manage-user/add_user', [ManageUserController::class, 'showAddUserForm']);
+
+// Route::post('/adminhome/manage-user/add_user', [ManageUserController::class, 'addUser']);
+
+// Route::get('/adminhome/manage-user/update/{id?}', [ManageUserController::class, 'showUpdateUserForm']);
+// Route::post('/adminhome/manage-user/update/{id?}', [ManageUserController::class, 'updateUser']);
+
+
+// });
 Route::group(['middleware' => 'checkUserType:student'], function () {
    
     Route::get('/home', function () {
@@ -76,7 +127,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::post('/register', [RegisterController::class, 'register']);
 
 
-Route::post('/forgotpass', [OTPController::class, 'resetpass'])->name('forgotpass');
+// Route::post('/forgotpass', [OTPController::class, 'resetpass']);
 // Route::get('/password/reset', [ForgotPasswordController::class, 'showResetForm'])->name('password.reset');
 // Define other necessary routes for authentication
 // Route::get('/admin', [AdminController::class, 'index'])->name('admin.home');

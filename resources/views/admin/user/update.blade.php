@@ -16,16 +16,22 @@
                 <div class="card">
                     <div class="card-header">Update User</div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('admin.update_user', ['id' => $user->id]) }}">
+                    
+                    <form method="POST" action="{{ url('admin/user/update') }}">
+
                             @csrf
                             <!-- Input fields for user details -->
+                            <div class="form-group d-none">
+                                <label for="id">User Id</label>
+                                <input type="text" class="form-control" id="id" name="id" value="{{ $user->user_id }}">
+                            </div>
                             <div class="form-group">
                                 <label for="firstname">First Name</label>
-                                <input type="text" class="form-control" id="firstname" name="firstname" value="{{ $user->firstname }}">
+                                <input type="text" class="form-control" id="firstname" name="firstname" value="{{ $user->fname }}">
                             </div>
                             <div class="form-group">
                                 <label for="lastname">Last Name</label>
-                                <input type="text" class="form-control" id="lastname" name="lastname" value="{{ $user->lastname }}">
+                                <input type="text" class="form-control" id="lastname" name="lastname" value="{{ $user->lname }}">
                             </div>
                             <div class="form-group">
                                 <label for="password">Password</label>

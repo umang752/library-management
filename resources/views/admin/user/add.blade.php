@@ -13,7 +13,7 @@
                 <div class="card">
                     <div class="card-header">Add User</div>
                     <div class="card-body">
-                        <form method="POST" action="{{ route('admin.add_user') }}">
+                        <form method="post" action="{{ url('admin/user/add') }}">
                             @csrf
                             <div class="form-group">
                                 <label for="firstname">First Name</label>
