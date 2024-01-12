@@ -79,7 +79,7 @@ textarea {
 </head>
 <body>
     
-    <form action="/editbook" method="post" enctype="multipart/form-data">
+    <form action="/editbook/{{$data['book_id']}}" method="post" enctype="multipart/form-data">
         @csrf
         <h2>Edit Book</h2>
         <label for="name">Book Name</label>

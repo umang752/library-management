@@ -377,9 +377,9 @@
 								><span class="mtext">Home</span>
 							</a>
 							<ul class="submenu">
-								<li><a href="/manage-book">manage user</a></li>
-								<li><a href="index2.html">manage book</a></li>
-								<li><a href="index3.html">manage used books</a></li>
+								<li><a href="/manage-user">manage user</a></li>
+								<li><a href="/manage-book">manage book</a></li>
+								<li><a href="/manage-issue-books">manage Issued books</a></li>
 							</ul>
 						</li>
 						

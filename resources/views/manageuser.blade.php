@@ -5,78 +5,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-  
+
 </head>
 
 <body>
 
-<div class="contain">
+    <div class="contain">
         <div class="text">
-        <h1>Manage User</h1><br>
-        <div >
-        <button id="add" type="button" onclick="window.location.href='/addbook'">AddUser</button>
+            <h1>Manage User</h1><br>
+            <div>
+                <button id="add" type="button" onclick="window.location.href='/adduser'">AddUser</button>
+                <button id="add" type="button" class="cancel-btn" onclick="window.location.href='/example-page'">Back</button>
 
-        <!-- <a href="/addbook" class="button">Add Book</a> -->
-        <!-- <a href="/signup" class="button">Edit</a>
+
+                <!-- <a href="/addbook" class="button">Add Book</a> -->
+                <!-- <a href="/signup" class="button">Edit</a>
         <a href="/login" class="button">Logout</a> -->
 
-    </div>
-        <form id="form" action="/edit" method="post" > 
-  
-  <table style="width: 100%">
-        @csrf
-       
-               
-                <tr>
-                <th>user id</th>
-                <th>first name</th>
-                <th>last name</th>
-                <th>description</th>
-                <th>author</th>
-               
-                <th>status</th>
-                <th>issued copies</th>
-                <th>total inventory</th>
-                <th>price</th>
-                <th>photo</th>
-                <th>action</th>
-                <!-- <button type="submit" id="bt">edit</button> -->
-</tr>
+            </div>
+            <form id="form" method="post">
 
-@foreach ($query as $q)
+                <table style="width: 100%">
+                    @csrf
+
+
                     <tr>
-                    <td>{{$q->book_id}}</td>
-                        <td>{{$q->name}}</td>
-                       
-                        <td>{{$q->description}}</td>
-                        <td>{{$q->author}}</td>
+                        <th>user id</th>
+                        <th>first name</th>
+                        <th>last name</th>
+                        <th>email</th>
+                        <th>password</th>
+
+                        <th>status</th>
+                        <th>phone</th>
+                        <th>action</th>
+                        <!-- <button type="submit" id="bt">edit</button> -->
+                    </tr>
+
+                    @foreach ($query as $q)
+                    <tr>
+                        <td>{{$q->user_id}}</td>
+                        <td>{{$q->first_name}}</td>
+
+                        <td>{{$q->last_name}}</td>
+                        <td>{{$q->email}}</td>
+                        <td>{{$q->password}}</td>
                         <td>{{$q->status}}</td>
-                        <td>{{$q->issued_copies}}</td>
-                        <td>{{$q->total_inventory}}</td>
-                        <td>{{$q->price}}</td>
-                        <td width="200px">
-                            <img src="{{ asset('images/'.$q->photo) }}" width="150px" height="150px" alt="image" title="job image">
-                        </td>
+                        <td>{{$q->phone_number}}</td>
                         <td>
-                            <a href="/editbook/{{$q->book_id}}" class="edit-button">Edit</a>
-                            <a href="/issuebook" class="delete-button">issue</a>
+                            <a href="/edituser/{{$q->user_id}}" class="edit-button">Edit</a>
+                            <a href="/deleteuser/{{$q->user_id}}" class="delete-button">Delete</a>
+                            <a href="/membership/{{$q->user_id}}" class="edit-button">membership</a>
                         </td>
                     </tr>
                     @endforeach
+                    {{$query ->links()}}
 
-                  
-</table>
-</form>
+                </table>
+                @if (session('message'))
+                <div id="alert-success">
+                    {{ session('message') }}
 
-</div>
+                </div>
+                @endif
+            </form>
 
         </div>
+
+    </div>
 </body>
 <script>
+    window.onload = function() {
+        setTimeout(function() {
+            var successMessage = document.getElementById('alert-success');
+            if (successMessage) {
+                successMessage.style.display = 'none';
+            }
+        }, 5000);
+    };
     $(document).ready(function() {
         $('.table').DataTable();
     });
 </script>
+
 </html>
 
 
@@ -84,9 +95,11 @@
 
 
 <style>
-   .cls table, th, td {
-  border:1px solid white;
-}
+    .cls table,
+    th,
+    td {
+        border: 1px solid white;
+    }
 
     .box-body {
         overflow-y: auto;
@@ -95,20 +108,27 @@
         /* Set a maximum height for the container to enable scrolling */
     }
 
+    #alert-success {
+        color: green;
+        font-size: small;
+    }
+
 
     * {
         margin: 0%;
         padding: 0%;
     }
-     h1{
-        color:white;
-     }
+
+    h1 {
+        color: white;
+    }
+
     body {
         background-color: black;
         background-size: 100% 740px;
     }
 
-   tr{
+    tr {
         padding-top: 10px;
         padding-left: 40%;
         width: 20px;
@@ -138,7 +158,7 @@
         padding-left: 10px;
     }
 
-   
+
     .text button {
         width: 100px;
         height: 10px;
@@ -165,38 +185,37 @@
         align-content: right;
         color: white;
     }
-    .edit-button, .delete-button {
-    display: inline-block;
-    padding: 5px 10px;
-    margin-right: 5px;
-    background-color: #007BFF;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    text-decoration: none;
-    cursor: pointer;
-}
-.delete-button {
-    background-color: #FF3547;
-}
-#add{
-    
-  background-color: blue;
-  border: none;
-  color: white;
-  padding: 15px 32px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 12px;
-  margin: 4px 2px ;
-  cursor: pointer;
- 
-}
 
+    .edit-button,
+    .delete-button {
+        display: inline-block;
+        padding: 5px 10px;
+        margin-right: 5px;
+        background-color: #007BFF;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 12px;
+        text-decoration: none;
+        cursor: pointer;
+    }
 
+    .delete-button {
+        background-color: #FF3547;
+    }
 
+    #add {
 
+        background-color: blue;
+        border: none;
+        color: white;
+        padding: 15px 32px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 12px;
+        margin: 4px 2px;
+        cursor: pointer;
 
+    }
 </style>

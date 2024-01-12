@@ -66,7 +66,7 @@
 </head>
 
 <body>
-  <form action="/register" method="post">
+  <form action="/adduser" method="post">
     @csrf
     <div>
       <label for="fname">First Name:</label>
@@ -126,10 +126,8 @@
       <option>Student</option>
     </select>
 
-    <button type="submit">Sign Up</button>
-    <button type="button" class="login-btn" onclick="window.location.href='/login'">Login</button>
+    <button type="submit">Add User</button>
   </form>
 </body>
-
 
 </html>

@@ -22,6 +22,8 @@ return array(
     'App\\Http\\Controllers\\LoginController' => $baseDir . '/app/Http/Controllers/LoginController.php',
     'App\\Http\\Controllers\\LogoutController' => $baseDir . '/app/Http/Controllers/LogoutController.php',
     'App\\Http\\Controllers\\ManageBOokController' => $baseDir . '/app/Http/Controllers/ManageBOokController.php',
+    'App\\Http\\Controllers\\ManageIssuedBooksController' => $baseDir . '/app/Http/Controllers/ManageIssuedBooksController.php',
+    'App\\Http\\Controllers\\ManageUserController' => $baseDir . '/app/Http/Controllers/ManageUserController.php',
     'App\\Http\\Controllers\\RegisterController' => $baseDir . '/app/Http/Controllers/RegisterController.php',
     'App\\Http\\Kernel' => $baseDir . '/app/Http/Kernel.php',
     'App\\Http\\Middleware\\Authenticate' => $baseDir . '/app/Http/Middleware/Authenticate.php',
