@@ -12,6 +12,11 @@
 </head>
 
 <body>
+@if(session('alert'))
+        <div class="alert alert-danger">
+            {{ session('alert') }}
+        </div>
+    @endif
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-6">
@@ -47,15 +52,15 @@
                             </div>
                             <div class="form-group">
                                 <label for="total_inventory">Total Inventory</label>
-                                <input type="number" class="form-control" id="total_inventory" name="total_inventory" value="{{ $book->total_inventory }}">
+                                <input type="number" min="0" class="form-control" id="total_inventory" name="total_inventory" value="{{ $book->total_inventory }}">
                             </div>
                             <div class="form-group">
                                 <label for="issued_copies">Issued Copies</label>
-                                <input type="number" class="form-control" id="issued_copies" name="issued_copies" value="{{ $book->issued_copies }}">
+                                <input type="number" min="0" class="form-control" id="issued_copies" name="issued_copies" value="{{ $book->issued_copies }}">
                             </div>
                             <div class="form-group">
                                 <label for="price">Price</label>
-                                <input type="number" class="form-control" id="price" name="price" value="{{ $book->price }}">
+                                <input type="number" min="0" class="form-control" id="price" name="price" value="{{ $book->price }}">
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">Update</button>
                         </form>

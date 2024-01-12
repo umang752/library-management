@@ -55,7 +55,7 @@ class ManageUserController extends Controller
             'type' => 'student',
         ]);
 
-        return redirect('admin/user');
+        return redirect('admin/user')->with('success', 'User addedd ');
     }
 
     public function showUpdateUserForm($id)
@@ -78,7 +78,7 @@ class ManageUserController extends Controller
         // $user->role= $request['user_role'];  
 
         $user->save();
-        return redirect('/admin/user');
+        return redirect('/admin/user')->with('success', 'User updated ');
 
 
     }

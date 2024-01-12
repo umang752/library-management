@@ -46,6 +46,11 @@
 </head>
 
 <body>
+@if(session('alert'))
+        <div class="alert alert-danger">
+            {{ session('alert') }}
+        </div>
+    @endif
     <div class="container">
         <a href="{{ url('/admin/user/add') }}" class="btn btn-primary mb-3">Add User</a>
         <a href="{{ url('/admin') }}" class="btn btn-secondary btn-home">Home</a>

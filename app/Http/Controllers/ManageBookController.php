@@ -97,6 +97,6 @@ class ManageBookController extends Controller
         $book->price = $request->input('price');
 
         $book->save();
-        return redirect('/admin/book');
+        return redirect('/admin/book')->with('success', 'book details updated');
     }
 }

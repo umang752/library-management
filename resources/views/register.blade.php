@@ -42,7 +42,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone No.</label>
-                                <input id="phone" type="number " minlength="10" class="form-control" name="phone" required>
+                                <input id="phone" type="number" minlength="10" min="1000000000" class="form-control" name="phone" required>
                             </div>
                             <button type="submit" class="btn btn-primary">Sign Up</button>
                         </form>

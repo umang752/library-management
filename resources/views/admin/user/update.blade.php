@@ -10,6 +10,11 @@
     </style>
 </head>
 <body>
+@if(session('alert'))
+        <div class="alert alert-danger">
+            {{ session('alert') }}
+        </div>
+    @endif
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-6">
@@ -40,7 +45,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone No.</label>
-                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ $user->phone }}">
+                                <input type="number" minlength="10" min="1000000000" class="form-control" id="phone" name="phone" value="{{ $user->phone }}">
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">Update</button>
                         </form>
