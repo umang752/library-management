@@ -1,3 +1,4 @@
+@extends('back.layout.pages-layout')
 <!DOCTYPE html>
 <html lang="en">
 
@@ -9,19 +10,14 @@
 </head>
 
 <body>
-
+@section('content')
     <div class="contain">
         <div class="text">
             <h1>Manage Issue Book</h1><br>
             <div>
                 <div>
-                    <button id="add" type="button" onclick="window.location.href='/addbook'">Issue</button>
-                    <button id="add" type="button" class="cancel-btn" onclick="window.location.href='/example-page'">Back</button>
-
-                    <div>
-                        <!-- <a href="/addbook" class="button">Add Book</a> -->
-                        <!-- <a href="/signup" class="button">Edit</a>
-        <a href="/login" class="button">Logout</a> -->
+                    <button id="add" type="button" onclick="window.location.href='/adduserbookissue'">Issue</button>
+                   <div>
 
                     </div>
                     <form id="form" action="/edit" method="post">
@@ -51,18 +47,20 @@
                                     <a href="/editbook/{{$q->book_id}}" class="edit-button">Edit</a>
                                     <a href="/issuebook" class="delete-button">lost</a>
                                     <a href="/editbook/{{$q->book_id}}" class="edit-button">return</a>
-                                    <a href="/issuebook" class="delete-button">issue</a>
+                                    
                                 </td>
                             </tr>
                             @endforeach
+                            <div class="d-flex justify-content-center" id="page">
                             {{$query ->links()}}
-
+</div>
                         </table>
                     </form>
 
                 </div>
 
             </div>
+            @stop
 </body>
 <script>
     $(document).ready(function() {
@@ -77,10 +75,13 @@
 
 
 <style>
+    #page{
+        margin-top: 20px;
+    }
     .cls table,
     th,
     td {
-        border: 1px solid white;
+        border: 1px solid black;
     }
 
     .box-body {
@@ -97,11 +98,11 @@
     }
 
     h1 {
-        color: white;
+        color: black;
     }
 
     body {
-        background-color: black;
+        background-color: whitesmoke;
         background-size: 100% 740px;
     }
 
@@ -111,7 +112,7 @@
         width: 20px;
         height: 30px;
         text-align: center;
-        color: white;
+        color: black;
 
 
 
@@ -124,13 +125,13 @@
 
     .cls {
 
-        border: 3px solid white;
-        background-color: black;
+        border: 3px solid black;
+        background-color: whitesmoke;
 
         width: 250px;
         font-size: 20px;
         margin-top: 30px;
-        color: white;
+        color: black;
         height: 40px;
         padding-left: 10px;
     }
@@ -140,8 +141,8 @@
         width: 100px;
         height: 10px;
         background-color: blue;
-        color: black;
-        border: white;
+        color: whitesmoke;
+        border: black;
         font-size: 22px;
         /* border-radius: 25px; */
         margin-top: 20px;

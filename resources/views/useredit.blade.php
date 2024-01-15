@@ -48,24 +48,22 @@
       background-color: #45a049;
     }
 
-    .login-btn {
-      background-color: #3498db;
-    }
-
-    .login-btn:hover {
-      background-color: #2980b9;
-    }
+    
     .error-message{
       color:red;
       font-size: smaller;
     }
+    .required {
+      color: red;
+      margin-left: 3px;
+    }
   </style>
 </head>
 <body>
-  <form action="/edituser/{{$data['user_id']}}" method="post" >
+  <form action="/edituser/{{$data['user_id']}}" method="post"  autocomplete="off">
     @csrf
     <div>
-    <label for="fname">First Name:</label>
+    <label for="fname">First Name<span class="required">*</span></label>
     <input type="text" id="fname" name="fname" required value="{{$data['first_name']}}">
     <div class="error-message" class="alert alert-danger">
     @error('fname')
@@ -74,7 +72,7 @@
   </div>
   </div>
   <div>
-    <label for="lname">Last Name:</label>
+    <label for="lname">Last Name<span class="required">*</span></label>
     <input type="text" id="lname" name="lname" required value="{{$data['last_name']}}">
     <div class="error-message" class="alert alert-danger">
     @error('lname')
@@ -83,7 +81,7 @@
   </div>
   </div>
   <div>
-    <label for="email">Email:</label>
+    <label for="email">Email<span class="required">*</span></label>
     <input type="email" id="email" name="email" required value="{{$data['email']}}">
     <div class="error-message" class="alert alert-danger">
     @error('email')
@@ -91,17 +89,9 @@
         @enderror
   </div>
   </div>
+  
   <div>
-    <label for="password">Password:</label>
-    <input type="password" id="password" name="password" required value="{{$data['password']}}">
-    <div class="error-message" class="alert alert-danger">
-    @error('password')
-            <span>{{ $message }}</span>
-        @enderror
-    </div>
-  </div>
-  <div>
-    <label for="phone">Phone:</label>
+    <label for="phone">Phone<span class="required">*</span></label>
     <input type="tel" id="phone" name="phone" required value="{{$data['phone_number']}}">
     <div class="error-message" class="alert alert-danger">
     @error('phone')
@@ -110,19 +100,21 @@
   </div>
   </div>
   
-    <label for="status">Status</label>
+    <label for="status">Status<span class="required">*</span></label>
     <select id="status" name="status" required value="{{$data['status']}}">
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
     </select>
 
-    <label for="role">Role:</label>
+    <label for="role">Role<span class="required">*</span></label>
     <select id="role" name="role" required value="{{$data['role']}}">
       <option >Admin</option>
       <option >Student</option>
     </select>
 
     <button type="submit">Edit User</button>
+    <button id="deleteButton" type="button" onclick="window.location.href='/manage-user'" style="float: right;">Cancel</button>
+
     </form>
 </body>
 </html>

@@ -17,6 +17,7 @@ class LoginController extends Controller
 
             return redirect()->intended('/example-page');
         }
+        session()->forget('_old_input');
 
         return view('login');
     }

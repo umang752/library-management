@@ -54,7 +54,7 @@ button {
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    width: 100%;
+  
 }
 
 button:hover {
@@ -75,41 +75,79 @@ select {
 textarea {
     resize: vertical;
 }
+.required {
+      color: red;
+      margin-left: 3px;
+    }
+    .error-message {
+      color: red;
+      font-size: smaller;
+    }
 </style>
 </head>
 <body>
     
-    <form action="/addbook" method="post" enctype="multipart/form-data">
+    <form action="/addbook" method="post" enctype="multipart/form-data" autocomplete="off">
         @csrf
         <h2>Add Book</h2>
-        <label for="name">Book Name</label>
-        <input type="text" id="name" name="name" required>
-
-        <label for="author">Author</label>
-        <input type="text" id="author" name="author" required>
-
-        <label for="description">Description</label>
-        <textarea id="description" name="description" required></textarea>
-
-        <label for="status">Status</label>
-        <select id="status" name="status" required>
+        <label for="name">Book Name<span class="required">*</span></label>
+        <input type="text" id="name" name="name" required value="{{ old('name') }}">
+        <div class="error-message" class="alert alert-danger">
+        @error('name')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="author">Author<span class="required">*</span></label>
+        <input type="text" id="author" name="author" required value="{{ old('author') }}">
+        <div class="error-message" class="alert alert-danger">
+        @error('author')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="description">Description<span class="required">*</span></label>
+        <input id="description" name="description" required value="{{ old('description') }}"></input>
+        <div class="error-message" class="alert alert-danger">
+        @error('description')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="status">Status<span class="required">*</span></label>
+        <select id="status" name="status" required value="{{ old('status') }}">
             <option value="available">Available</option>
             <option value="unavailable">Unavailable</option>
         </select>
 
-        <label for="price">Price:</label>
-        <input  id="price" name="price" value="0" required>
-
-        <label for="issued_copies">Issued Copies</label>
-        <input id="issued_copies" name="issued_copies" value="0">
-
-        <label for="total_inventory">Total Inventory</label>
-        <input  id="total_inventory" name="total_inventory" value="10">
-
-        <label for="photo">Photo</label>
-        <input type="file" id="photo" name="photo" accept="image/*">
-
+        <label for="price">Price<span class="required">*</span></label>
+        <input  id="price" name="price" value="0" required value="{{ old('price') }}"> 
+        <div class="error-message" class="alert alert-danger">
+        @error('price')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="issued_copies">Issued Copies<span class="required">*</span></label>
+        <input id="issued_copies" name="issued_copies" value="0" value="{{ old('issued_copies') }}">
+        <div class="error-message" class="alert alert-danger">
+        @error('issued_copies')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="total_inventory">Total Inventory<span class="required">*</span></label>
+        <input  id="total_inventory" name="total_inventory" value="10" value="{{ old('total_inventory') }}">
+        <div class="error-message" class="alert alert-danger">
+        @error('total_inventory')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+        <label for="photo">Photo<span class="required">*</span></label>
+        <input type="file" id="photo" name="photo" accept="image/*" value="{{ old('photo') }}">
+        <div class="error-message" class="alert alert-danger">
+        @error('photo')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
         <button type="submit">Add Book</button>
+        <button id="deleteButton" type="button" onclick="window.location.href='/manage-book'" style="float: right;">Cancel</button>
+      
     </form>
 </body>
 </html>

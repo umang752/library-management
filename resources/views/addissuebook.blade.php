@@ -78,11 +78,14 @@
 
 <body>
 
-    <form action="/userbookissue/{{$data['book_id']}}" method="post"  autocomplete="off">
+    <form action="/adduserbookissue" method="post"  autocomplete="off">
         <h2>Issue Book Form</h2>
-        @csrf
+       
         <label for="user_id">User ID<span class="required">*</span></label><br>
         <input type="text" id="user_id" name="user_id"><br>
+
+        <label for="book_id">Book ID<span class="required">*</span></label><br>
+        <input type="text" id="book_id" name="book_id"><br>
 
         <label for="status">Status:</label><br>
         <select id="status" name="status">

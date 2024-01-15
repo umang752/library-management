@@ -62,15 +62,19 @@
       color: red;
       font-size: smaller;
     }
+    .required {
+      color: red;
+      margin-left: 3px;
+    }
   </style>
 </head>
 
 <body>
-  <form action="/adduser" method="post">
+  <form action="/adduser" method="post" autocomplete="off">
     @csrf
     <div>
-      <label for="fname">First Name:</label>
-      <input type="text" id="fname" name="fname" required>
+      <label for="fname">First Name<span class="required">*</span></label>
+      <input type="text" id="fname" name="fname" required value="{{ old('fname') }}">
       <div class="error-message" class="alert alert-danger">
         @error('fname')
         <span>{{ $message }}</span>
@@ -78,8 +82,8 @@
       </div>
     </div>
     <div>
-      <label for="lname">Last Name:</label>
-      <input type="text" id="lname" name="lname" required>
+      <label for="lname">Last Name<span class="required">*</span></label>
+      <input type="text" id="lname" name="lname" required value="{{ old('lname') }}">
       <div class="error-message" class="alert alert-danger">
         @error('lname')
         <span>{{ $message }}</span>
@@ -87,8 +91,8 @@
       </div>
     </div>
     <div>
-      <label for="email">Email:</label>
-      <input type="email" id="email" name="email" required>
+      <label for="email">Email<span class="required">*</span></label>
+      <input type="email" id="email" name="email" required value="{{ old('email') }}">
       <div class="error-message" class="alert alert-danger">
         @error('email')
         <span>{{ $message }}</span>
@@ -96,8 +100,8 @@
       </div>
     </div>
     <div>
-      <label for="password">Password:</label>
-      <input type="password" id="password" name="password" required>
+      <label for="password">Password<span class="required">*</span></label>
+      <input type="password" id="password" name="password" required value="{{ old('password') }}">
       <div class="error-message" class="alert alert-danger">
         @error('password')
         <span>{{ $message }}</span>
@@ -105,8 +109,17 @@
       </div>
     </div>
     <div>
-      <label for="phone">Phone:</label>
-      <input type="tel" id="phone" name="phone" required>
+      <label for="confirm_password">Confirm Password<span class="required">*</span></label>
+      <input type="password" id="confirm_password" name="confirm_password" required value="{{ old('confirm_password') }}">
+      <div class="error-message" class="alert alert-danger">
+        @error('confirm_password')
+        <span>{{ $message }}</span>
+        @enderror
+      </div>
+    </div>
+    <div>
+      <label for="phone">Phone<span class="required">*</span></label>
+      <input type="tel" id="phone" name="phone" required value="{{ old('phone') }}">
       <div class="error-message" class="alert alert-danger">
         @error('phone')
         <span>{{ $message }}</span>
@@ -115,18 +128,20 @@
     </div>
 
     <label for="status">Status</label>
-    <select id="status" name="status" required>
+    <select id="status" name="status" required value="{{ old('status') }}">
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
     </select>
 
-    <label for="role">Role:</label>
-    <select id="role" name="role" required>
+    <label for="role">Role</label>
+    <select id="role" name="role" required value="{{ old('role') }}">
       <option>Admin</option>
       <option>Student</option>
     </select>
 
     <button type="submit">Add User</button>
+    <button id="deleteButton" type="button" onclick="window.location.href='/manage-user'" style="float: right;">Cancel</button>
+
   </form>
 </body>
 

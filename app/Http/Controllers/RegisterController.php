@@ -19,11 +19,16 @@ class RegisterController extends Controller
             $rules = [
                 'fname' => 'required|alpha|max:30',
                 'lname' => 'required|alpha|max:20',
-                'phone' => 'required|numeric|digits:10',
+                // 'phone' => 'required|numeric|digits:10',
+                'phone' => [
+                    'required',
+                    'regex:/^[9876](?!.*(.)\1{4})[0-9]{9}$/',
+                ],
                 'email' => 'required|email|unique:users|max:50',
                 'status' => 'required|alpha|max:20',
                 'role' => 'required|alpha|max:20',
                 'password' => 'required|min:8',
+                'confirm_password' => 'required|same:password',
             ];
             $validator = Validator::make($request->all(), $rules);
             if ($validator->fails()) {

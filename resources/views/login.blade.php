@@ -133,10 +133,10 @@
 </head>
 
 <body>
-  <form action="/signin" method="post">
+  <form action="/signin" method="post" autocomplete="off">
     @csrf
     <h2>Login</h2>
-    <label for="email">Email:</label>
+    <label for="email">Email</label>
     <input type="email" id="email" name="email" required>
 
     @if (session('message'))
@@ -144,24 +144,17 @@
       {{ session('message') }}
     </div>
     @endif
-    <label for="password">Password:</label>
+    <label for="password">Password</label>
     <input type="password" id="password" name="password" required>
 
     <button type="submit">Login</button>
     <div style="margin-top: 16px;">
-      <!-- <button type="button" href="">Sign Up</button> -->
-      <button type="button" onclick="window.location.href='/signup'">Sign Up</button>
-
-      <!-- <a href="#">Sign Up</a> -->
-
-    </div>
+     <button type="button" onclick="window.location.href='/signup'">Sign Up</button>
+</div>
 
     <div style="margin-top: 16px;">
-      <!-- Add a link for "Forgot Password?" -->
       <a href="/forgot-password">Forgot Password?</a>
-
-
-    </div>
+ </div>
 
     @if ($errors->any())
     <div id="error-message" class="alert alert-danger">

@@ -1,27 +1,23 @@
+@extends('back.layout.pages-layout')
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- <meta http-equiv="refresh" content="5"> -->
     <title>Document</title>
 
 </head>
 
 <body>
-
+@section('content')
     <div class="contain">
         <div class="text">
             <h1>Manage Book</h1><br>
             <div>
                 <button id="add" type="button" onclick="window.location.href='/addbook'">AddBook</button>
-                <button id="add" type="button" class="cancel-btn" onclick="window.location.href='/example-page'">Back</button>
-
-                <!-- <a href="/addbook" class="button">Add Book</a> -->
-                <!-- <a href="/signup" class="button">Edit</a>
-        <a href="/login" class="button">Logout</a> -->
-
-            </div>
+               </div>
             <form id="form" action="/edit" method="post">
 
                 <table style="width: 100%">
@@ -41,6 +37,8 @@
                         <th>photo</th>
                         <th>action</th>
                         <!-- <button type="submit" id="bt">edit</button> -->
+                       
+
                     </tr>
 
                     @foreach ($query as $q)
@@ -55,7 +53,7 @@
                         <td>{{$q->total_inventory}}</td>
                         <td>{{$q->price}}</td>
                         <td width="200px">
-                            <img src="{{ asset('images/'.$q->photo) }}" width="150px" height="150px" alt="image" title="job image">
+                            <img src="{{ asset($q->photo) }}" width="150px" height="150px" alt="image" title="job image">
                         </td>
                         <td>
                             <a href="/editbook/{{$q->book_id}}" class="edit-button">Edit</a>
@@ -64,15 +62,40 @@
                     </tr>
                     @endforeach
 
-                    {{$query ->links()}}
-
-
-                </table>
+                   
+                    </table>
+                    <div class="d-flex justify-content-center" id="page">
+                        {{$query ->links()}}
+                        </div>
             </form>
+            <br>
+            <br>
+            @if (session('success'))
+                    <div id="successMessage" class="alert alert-success">
+                        {{ session('success') }}
+                    </div>
 
+                    <script>
+                        setTimeout(function() {
+                           document.getElementById('successMessage').style.display = 'none';
+                        }, 5000);
+                    </script>
+                    @endif
+                    @if (session('error'))
+                    <div id="errorMessage" class="alert alert-error">
+                        {{ session('error') }}
+                    </div>
+
+                    <script>
+                        setTimeout(function() {
+                           document.getElementById('errorMessage').style.display = 'none';
+                        }, 5000);
+                    </script>
+                    @endif    
         </div>
 
     </div>
+    @stop
 </body>
 <script>
     $(document).ready(function() {
@@ -87,10 +110,23 @@
 
 
 <style>
+   #page{
+   margin-top: 20px;
+   }
+    #successMessage {
+        color: green;
+      font-size: large;
+      text-align: center;
+    }
+    #errorMessage {
+        color: red;
+      font-size: large;
+      text-align: center;
+    }
     .cls table,
     th,
     td {
-        border: 1px solid white;
+        border: 1px solid black;
     }
 
     .box-body {
@@ -107,21 +143,21 @@
     }
 
     h1 {
-        color: white;
+        color: black;
     }
 
     body {
-        background-color: black;
+        background-color: whitesmoke;
         background-size: 100% 740px;
     }
 
     tr {
-        padding-top: 10px;
-        padding-left: 40%;
+        /* padding-top: 10px; */
+        /* padding-left: 40%; */
         width: 20px;
         height: 30px;
         text-align: center;
-        color: white;
+        color: black;
 
 
 
@@ -134,15 +170,15 @@
 
     .cls {
 
-        border: 3px solid white;
-        background-color: black;
+        border: 3px solid black;
+        background-color: whitesmoke;
 
         width: 250px;
         font-size: 20px;
-        margin-top: 30px;
+        /* margin-top: 30px; */
         color: white;
         height: 40px;
-        padding-left: 10px;
+        /* padding-left: 10px; */
     }
 
 
@@ -150,11 +186,11 @@
         width: 100px;
         height: 10px;
         background-color: blue;
-        color: black;
-        border: white;
+        color: white;
+        border: black;
         font-size: 22px;
         /* border-radius: 25px; */
-        margin-top: 20px;
+        /* margin-top: 20px; */
 
 
     }

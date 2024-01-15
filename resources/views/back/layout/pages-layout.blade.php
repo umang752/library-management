@@ -62,7 +62,7 @@
         @stack('stylesheets')
 	</head>
 	<body>
-		<div class="pre-loader">
+		<!-- <div class="pre-loader">
 			<div class="pre-loader-box">
 				<div class="loader-logo">
 					<img src="/back/vendors/images/deskapp-logo.svg" alt="" />
@@ -73,7 +73,7 @@
 				<div class="percent" id="percent1">0%</div>
 				<div class="loading-text">Loading...</div>
 			</div>
-		</div>
+		</div> -->
 
 		<div class="header">
 			<div class="header-left">
@@ -354,39 +354,7 @@
 			</div>
 		</div>
 
-		<div class="left-side-bar">
-			<div class="brand-logo">
-				<a href="index.html">
-					<img src="/back/vendors/images/deskapp-logo.svg" alt="" class="dark-logo" />
-					<img
-						src="/back/vendors/images/deskapp-logo-white.svg"
-						alt=""
-						class="light-logo"
-					/>
-				</a>
-				<div class="close-sidebar" data-toggle="left-sidebar-close">
-					<i class="ion-close-round"></i>
-				</div>
-			</div>
-			<div class="menu-block customscroll">
-				<div class="sidebar-menu">
-					<ul id="accordion-menu">
-						<li class="dropdown">
-							<a href="javascript:;" class="dropdown-toggle">
-								<span class="micon bi bi-house"></span
-								><span class="mtext">Home</span>
-							</a>
-							<ul class="submenu">
-								<li><a href="/manage-user">manage user</a></li>
-								<li><a href="/manage-book">manage book</a></li>
-								<li><a href="/manage-issue-books">manage Issued books</a></li>
-							</ul>
-						</li>
-						
-					</ul>
-				</div>
-			</div>
-		</div>
+	@include('layouts.sidebar')
 		<div class="mobile-menu-overlay"></div>
 
 		<div class="main-container">
@@ -403,8 +371,9 @@
 							
 						</div>
 					</div>
-					<div class="pd-20 bg-white border-radius-4 box-shadow mb-30"></div>
-                    @yield('content')
+					<div class="pd-20 bg-white border-radius-4 box-shadow mb-30"> @yield('content')</div>
+                   
+					
 				</div>
 				<!-- <div class="footer-wrap pd-20 mb-20 card-box">
 					DeskApp - Bootstrap 4 Admin Template By

@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use Illuminate\Support\Facades\DB;
 use App\Models\Book;
 use App\Models\Bookissued;
 use App\Models\User;
@@ -17,6 +17,24 @@ class AddBookController extends Controller
 
     public function postAddBook(Request $request)
     {
+        $rules = [
+            'name' => 'required|alpha|max:30',
+            'author' => 'required|alpha|max:20',
+            // 'phone' => 'required|numeric|digits:10',
+            
+            'description' => 'required',
+            'status' => 'required|alpha|max:20',
+            'price' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/|min:0',
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'issued_copies' => 'required|numeric|lte:total_inventory',
+            'total_inventory' => 'required|numeric',
+        ];
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput($request->input());
+        } else {
         // $input = $request->all();
         $book = new Book;
         $book->name = $request->name;
@@ -36,7 +54,8 @@ class AddBookController extends Controller
         $book->total_inventory = $request->total_inventory;
         $book->save();
 
-        return redirect()->to('manage-book');
+        return redirect()->to('manage-book')->with('success', 'Book Added successfully');
+    }
     }
     public function userbookissue($id)
     {
@@ -57,8 +76,15 @@ class AddBookController extends Controller
             $membership->status = $user->status;
             $membership->reneu_date = (clone Carbon::now())->addDays(24)->format('Y-m-d H:i:s');
             $membership->save();
-        }
-        return redirect()->to('manage-book');
+            Book::where('book_id', $id)->update([
+                'issued_copies' =>DB::raw('issued_copies + 1'),
+                'total_inventory' =>DB::raw('total_inventory - 1'),
+            ]);
+        return redirect()->to('manage-book')->with('success', 'Book Issued successfully');
+    }
+    else {
+        return redirect()->to('manage-book')->with('error', 'user not registered');
+    }
     }
 
     public function editBook($id)
@@ -74,6 +100,30 @@ class AddBookController extends Controller
 
         // $id = (int) $id;
         $inputs = $request->all();
+        $rules = [
+            'name' => 'required|alpha|max:30',
+            'author' => 'required|alpha|max:20',
+            // 'phone' => 'required|numeric|digits:10',
+            
+            'description' => 'required',
+            'status' => 'required|alpha|max:20',
+            'price' => 'required|numeric|regex:/^\d+(\.\d{1,2})?$/|min:0',
+            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'issued_copies' => 'required|numeric|lte:total_inventory',
+            'total_inventory' => 'required|numeric',
+        ];
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return redirect()->back()
+                ->withErrors($validator)
+                ->withInput($request->input());
+        } 
+        if ($request->hasFile('photo')) {
+            $imageName = time() . '.' . $request->photo->extension();
+            $request->photo->move(public_path('images'), $imageName);
+// dd("hiiii");
+            $photo = 'images/' . $imageName;
+        }
         $result = Book::where('book_id', $id)->update([
 
             'name' => $inputs['name'],
@@ -83,8 +133,9 @@ class AddBookController extends Controller
             'status' => $inputs['status'],
             'issued_copies' => $inputs['issued_copies'],
             'total_inventory' => $inputs['total_inventory'],
-            // 'photo' => $inputs['photo']
+            'photo' => $photo
+          
         ]);
-        return redirect()->to('manage-book');
+        return redirect()->to('manage-book')->with('success', 'Book edited successfully');
     }
 }

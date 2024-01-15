@@ -66,7 +66,7 @@
             <h2>Membership Form</h2>
 
             <button type="submit" class="submit-btn">Membership</button>
-            <button type="button" class="cancel-btn" onclick="window.location.href='/manage-user'">Cancel</button>
+            <button type="button" class="cancel-btn" onclick="window.location.href='/manage-user'" style="float: right;">Cancel</button>
         </form>
     </div>
 </body>

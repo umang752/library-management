@@ -11,6 +11,7 @@ use App\Http\Controllers\ForgetPasswordController;
 use App\Http\Controllers\ManageBOokController;
 use App\Http\Controllers\ManageUserController;
 use App\Http\Controllers\ManageIssuedBooksController;
+use  App\Http\Middleware\Check;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -30,26 +31,26 @@ Route::get('/signup', function () {
 });
 Route::get('/login', [LoginController::class, 'getlogin']);
 Route::get('/logout', [LogoutController::class, 'logout']);
+Route::middleware([Check::class])->group(function(){
 Route::get('/addbook', function () {
     return view('addbook');
 });
-Route::middleware(['auth'])->group(function () {
+
     Route::view('/example-page', 'example-page');
     Route::view('/example-auth', 'example-auth');
     Route::get('/dashboard', [DashboardController::class, 'dashboard']);
-});
+
 Route::get('/forgot-password', [ForgetPasswordController::class, 'showForgotPasswordForm']);
 Route::post('/reset-password', [ForgetPasswordController::class, 'resetPassword']);
 Route::get('/manage-book', [ManageBOokController::class, 'showbooks']);
 Route::get('/manage-issue-books', [ManageIssuedBooksController::class, 'showissuebooks']);
 
 Route::get('/manage-user', [ManageUserController::class, 'showusers']);
-// Route::post('/manage-bookdata', [ManageBOokController::class,'showbooksdata']);
 Route::get('/dashboard', [DashboardController::class, 'dashboard']);
 Route::post('/editbook/{id}', [AddBookController::class, 'posteditbook']);
 Route::post('/edituser/{id}', [ManageUserController::class, 'postedituser']);
 Route::post('/membership/{id}', [ManageUserController::class, 'postAddMembership']);
-Route::post('/deleteuser/{id}', [ManageUserController::class, 'postdeleteuser']);
+Route::post('/deleteuser', [ManageUserController::class, 'postdeleteuser']);
 Route::post('/editissuebook/{id}', [ManageIssuedBooksController::class, 'posteditissuebook']);
 Route::post('/sendotp', [ForgetPasswordController::class, 'sendOtp']);
 Route::post('/addbook', [AddBookController::class, 'postAddBook']);
@@ -58,9 +59,12 @@ Route::get('/adduser', [ManageUserController::class, 'AddUser']);
 Route::get('/editbook/{id}', [AddBookController::class, 'editbook']);
 Route::get('/userbookissue/{id}', [AddBookController::class, 'userbookissue']);
 Route::post('/userbookissue/{id}', [AddBookController::class, 'postuserbookissue']);
+Route::post('/adduserbookissue', [ManageIssuedBooksController::class, 'postuserbookissue']);
+Route::get('/adduserbookissue', [ManageIssuedBooksController::class, 'getuserbookissue']);
 Route::get('/edituser/{id}', [ManageuserController::class, 'edituser']);
 Route::get('/membership/{id}', [ManageuserController::class, 'AddMembership']);
 Route::get('/deleteuser/{id}', [ManageuserController::class, 'deleteuser']);
 Route::get('/editissuebook/{id}', [ManageIssuedBooksController::class, 'editissuebook']);
 Route::post('/register', [RegisterController::class, 'postRegister']);
+});
 Route::post('/signin', [LoginController::class, 'postLogin']);
