@@ -12,8 +12,12 @@ class LoginController extends Controller
 
     public function showlogin()
     {
-        if(Auth::user()){
-            return redirect('/notfound');
+        $user=Auth::user();
+        if($user && $user->type=='admin'){
+            return redirect('/admin');
+        }
+        elseif($user && $user->type=='student'){
+            return redirect('/home');
         }
         else{
             return view('login');
@@ -32,13 +36,13 @@ class LoginController extends Controller
         if ($password && $password==$user->password) {
             Auth::login($user); 
             if($user->type=='admin'){
-                return redirect('/admin');
+                return redirect('/admin')->with('alert', 'admin login successful !!');
             }
-            else{return redirect('/home');}
+            else{return redirect('/home')->with('alert', 'student login successful !!');}
             
         }
         else{
-            return redirect()->back()->with('alert', 'credentials wrong!!');;
+            return redirect()->back()->with('alert', 'credentials wrong!!');
         }
     }
     else{

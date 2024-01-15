@@ -8,7 +8,9 @@ use App\Http\Controllers\ManageBookController;
 use App\Http\Controllers\ManageIssueController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\ResetPassController;
 use App\Http\Middleware\CheckUserType;
+use App\Http\Controllers\WelcomeController;
 // use App\Http\Middleware\OTPController;
 /*
 |--------------------------------------------------------------------------
@@ -28,7 +30,7 @@ Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], funct
     Route::get('/', [AdminController::class, 'showadmin']);
     
 
-    Route::group(['prefix' => '/user'], function () {
+    Route::group(['middleware' => 'checkUserType:admin','prefix' => '/user'], function () {
         Route::get('/', [ManageUserController::class, 'index']);
 
         Route::get('delete/{id?}', [ManageUserController::class, 'deleteUser']);
@@ -38,9 +40,13 @@ Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], funct
 
         Route::get('update/{id?}', [ManageUserController::class, 'showUpdateUserForm']);
         Route::post('update/{id?}', [ManageUserController::class, 'updateUser']);
+
+        Route::post('change-status/{id}', [ManageUserController::class, 'changeStatus']);
+
+
     });
 
-    Route::group(['prefix' => '/book'], function () {
+    Route::group(['middleware' => 'checkUserType:admin','prefix' => '/book'], function () {
         Route::get('/', [ManageBookController::class, 'index']);
 
         Route::get('delete/{id?}', [ManageBookController::class, 'deleteBook']);
@@ -50,9 +56,12 @@ Route::group(['middleware' => 'checkUserType:admin', 'prefix' => 'admin'], funct
 
         Route::get('update/{id?}', [ManageBookController::class, 'showUpdateBookForm']);
         Route::post('update/{id?}', [ManageBookController::class, 'updateBook']);
+
+        Route::post('change-status/{bookId}', [ManageBookController::class, 'changeStatus']);
+
     });
 
-    Route::group(['prefix' => '/issue'], function () {
+    Route::group( ['middleware' => 'checkUserType:admin','prefix' => '/issue'], function () {
         Route::get('/', [ManageIssueController::class, 'index']);
 
         // Route::get('delete/{id?}', [ManageBookController::class, 'deleteBook']);
@@ -80,10 +89,11 @@ Route::group(['middleware' => 'checkUserType:student'], function () {
 
 
 
-Route::get('/', function () {
-    return view('welcome');
-})->name('/');
+// Route::get('/', function () {
+//     return view('welcome');
+// })->name('/');
 
+Route::get('/', [WelcomeController::class, 'showwelcome']);
 
 Route::get('/notfound', function () {
     return view('notfound');
@@ -100,9 +110,8 @@ Route::get('/register', [RegisterController::class, 'showregister']);
 //     return view('register');
 // })->name('register');
 
-Route::get('/forgotpass', function () {
-    return view('forgotpass');
-})->name('forgotpass');
+
+Route::get('/forgotpass', [ResetPassController::class, 'showforgotpass']);
 
 
 Route::post('/login', [LoginController::class, 'login']);

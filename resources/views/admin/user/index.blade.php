@@ -1,91 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User List</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
-    <style>
-        /* Custom styles */
-        .table th {
-            background-color: #343a40;
-            color: #ffffff;
-        }
+@extends('admin')
 
-        .btn-primary {
-            background-color: #007bff;
-            border-color: #007bff;
-        }
-
-        .btn-primary:hover {
-            background-color: #0056b3;
-            border-color: #0056b3;
-        }
-
-        .btn-danger {
-            background-color: #dc3545;
-            border-color: #dc3545;
-        }
-
-        .btn-danger:hover {
-            background-color: #bd2130;
-            border-color: #bd2130;
-        }
-
-        .btn-success {
-            background-color: #28a745;
-            border-color: #28a745;
-        }
-
-        .btn-success:hover {
-            background-color: #218838;
-            border-color: #218838;
-        }
-    </style>
-</head>
-
-<body>
-@if(session('alert'))
+@section('content')
+    <h1>User Management</h1>
+    
+    @if(session('alert'))
         <div class="alert alert-danger">
             {{ session('alert') }}
         </div>
     @endif
-    <div class="container">
-        <a href="{{ url('/admin/user/add') }}" class="btn btn-primary mb-3">Add User</a>
-        <a href="{{ url('/admin') }}" class="btn btn-secondary btn-home">Home</a>
-        <table class="table table-striped table-bordered">
-            <thead>
-                <tr>
-                    <th>User ID</th>
-                    <th>First Name</th>
-                    <th>Last Name</th>
-                    <th>Email</th>
-                    <th>Phone Number</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($users as $user)
-                <tr>
-                    <td>{{ $user->user_id }}</td>
-                    <td>{{ $user->fname }}</td>
-                    <td>{{ $user->lname }}</td>
-                    <td>{{ $user->email }}</td>
-                    <td>{{ $user->phone }}</td>
-                    <td>{{ $user->status }}</td>
-                    <td>
-                        <a href="{{ url('admin/user/delete/'.$user->user_id) }}"><button
-                                class="btn btn-danger">Delete</button></a>
-                        <a href="{{ url('admin/user/update/'.$user->user_id) }}"><button
-                                class="btn btn-success">Update</button></a>
-                    </td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-</body>
 
-</html>
+    <a href="{{ url('/admin/user/add') }}" class="btn btn-primary mb-3">Add User</a>
+
+    <table class="table table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>First Name</th>
+                <th>Last Name</th>
+                <th>Email</th>
+                <th>Phone Number</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+
+
+<tbody>
+    @foreach($users as $user)
+        <tr>
+            <td>{{ $user->user_id }}</td>
+            <td>{{ $user->fname }}</td>
+            <td>{{ $user->lname }}</td>
+            <td>{{ $user->email }}</td>
+            <td>{{ $user->phone }}</td>
+            <td>
+               
+                <form action="{{ url('/admin/user/change-status/'.$user->user_id) }}" method="post">
+                    @csrf
+                    <select name="status" onchange="this.form.submit()">
+                        <option value="active" {{ $user->status === 'active' ? 'selected' : '' }}>Active</option>
+                        <option value="inactive" {{ $user->status === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                    </select>
+                </form>
+            </td>
+            <td>
+                        <a href="{{ url('admin/user/delete/'.$user->user_id) }}"><button class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this book?')">Delete</button></a>
+                        <a href="{{ url('admin/user/update/'.$user->user_id) }}"><button class="btn btn-success">Update</button></a>
+                    </td>
+        </tr>
+    @endforeach
+</tbody>
+    </table>
+
+   
+    <div class="pagination">
+        <span>Page {{ $users->currentPage() }} of {{ $users->lastPage() }}</span>
+        
+        @if ($users->onFirstPage())
+            <span class="disabled">« Previous</span>
+        @else
+            <a href="{{ $users->previousPageUrl() }}" rel="prev">« Previous</a>
+        @endif
+
+        @if ($users->hasMorePages())
+            <a href="{{ $users->nextPageUrl() }}" rel="next">Next »</a>
+        @else
+            <span class="disabled">Next »</span>
+        @endif
+    </div>
+@endsection

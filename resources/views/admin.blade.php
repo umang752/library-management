@@ -1,38 +1,70 @@
 <!DOCTYPE html>
-<html>
-<head>
-    <title>Admin Homepage</title>
-    <!-- Include Bootstrap CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
-            <form class="form-inline" action="{{ route('logout') }}" method="POST">
-                @csrf
-                <button class="btn btn-outline-danger my-2 my-sm-0" type="submit">Logout</button>
-            </form>
-        </div>
-    </nav>
+<html lang="en">
 
-    <div class="container mt-5">
-        <div class="text-center">
-            <h2>Welcome, Admin {{Auth::user()->fname}}!</h2>
-            <div class="row mt-4">
-                <div class="col-md-4">
-                    <a href="{{url('admin/user')}}" class="btn btn-primary btn-lg btn-block">Manage Users</a>
-                </div>
-                <div class="col-md-4">
-                    <a href="{{url('admin/book')}}"  class="btn btn-success btn-lg btn-block">Manage Books</a>
-                </div>
-                <div class="col-md-4">
-                    <a  href="{{url('admin/issue')}}"  class="btn btn-info btn-lg btn-block">Manage Issued Books</a>
-                </div>
-            </div>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            margin-top: 0; 
+        }
+
+        .sidebar {
+            position: fixed;
+            width: 200px;
+            height: 100%;
+            background-color: #343a40;
+            padding-top: 20px;
+            color: #ffffff;
+        }
+
+        .sidebar a {
+            padding: 8px;
+            text-decoration: none;
+            color: #ffffff;
+            display: block;
+            transition: background 0.3s;
+        }
+
+        .sidebar a:hover {
+            background-color: #555;
+        }
+
+        .content {
+            margin-left: 200px; 
+            padding: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="d-flex">
+        
+        <nav class="sidebar">
+            <a href="{{ url('/admin') }}">Dashboard</a>
+            <a href="{{ url('/admin/user') }}">Manage Users</a>
+            <a href="{{ url('/admin/book') }}">Manage Books</a>
+            <a href="{{ url('/logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">Logout</a>
+   
+            <form id="logout-form" action="{{ url('/logout') }}" method="POST" style="display: none;">
+                @csrf
+            </form>
+        </nav>
+        
+       
+        <div class="content">
+            <h1>Welcome to the Admin Panel</h1>
+            @yield('content')
         </div>
     </div>
 
-    <!-- Include Bootstrap JS -->
+    
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    
 </body>
+
 </html>

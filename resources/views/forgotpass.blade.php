@@ -13,7 +13,7 @@
                 <div class="card">
                     <div class="card-header">Forgot Password</div>
                     <div class="card-body">
-                        <form method="POST" action="{{route('forgotpass') }}">
+                        <form >
                             @csrf
                             <div class="form-group">
                                 <label for="email">Email</label>
@@ -23,10 +23,10 @@
                                 <label for="password">Password</label>
                                 <input id="password" type="password" class="form-control" name="password" required>
                             </div>
-                            <button type="submit" class="btn btn-primary">Send OTP</button>
+                            <button type="submit" class="btn btn-primary">Change Password</button>
                             
                         </form>
-                        <a href="{{ route('/') }}" class="btn btn-link">return to home</a>
+                        <a href="{{ url('/') }}" class="btn btn-link">return to home</a>
                     </div>
                 </div>
             </div>

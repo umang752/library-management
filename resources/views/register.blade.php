@@ -22,15 +22,15 @@
                             @csrf
                             <div class="form-group">
                                 <label for="firstname">First Name</label>
-                                <input id="firstname" type="text" class="form-control" name="firstname" required autofocus>
+                                <input  autocomplete="off" id="firstname" type="text" class="form-control" name="firstname" required autofocus>
                             </div>
                             <div class="form-group">
                                 <label for="lastname">Last Name</label>
-                                <input id="lastname" type="text" class="form-control" name="lastname" required>
+                                <input  autocomplete="off" id="lastname" type="text" class="form-control" name="lastname" required>
                             </div>
                             <div class="form-group">
                                 <label for="email">Email</label>
-                                <input id="email" type="email" class="form-control" name="email" required>
+                                <input  autocomplete="off" id="email" type="email" class="form-control" name="email" required>
                             </div>
                             <div class="form-group">
                                 <label for="password">Password</label>
@@ -42,7 +42,7 @@
                             </div>
                             <div class="form-group">
                                 <label for="phone">Phone No.</label>
-                                <input id="phone" type="number" minlength="10" min="1000000000" class="form-control" name="phone" required>
+                                <input  autocomplete="off" id="phone" type="number" minlength="10" min="1000000000" class="form-control" name="phone" required>
                             </div>
                             <button type="submit" class="btn btn-primary">Sign Up</button>
                         </form>

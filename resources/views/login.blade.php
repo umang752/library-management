@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Login Page</title>
-    <!-- Bootstrap CSS -->
+   
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -22,7 +22,7 @@
                             @csrf
                             <div class="form-group">
                                 <label for="email">Email</label>
-                                <input id="email" type="email" class="form-control" name="email" required autofocus>
+                                <input  autocomplete="off" id="email" type="email" class="form-control" name="email" required autofocus>
                             </div>
                             <div class="form-group">
                                 <label for="password">Password</label>

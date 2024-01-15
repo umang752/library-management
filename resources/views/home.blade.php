@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Home Page</title>
-    <!-- Bootstrap CSS -->
+   
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
@@ -15,7 +15,6 @@
                     <div class="card-body">
                         <p>Welcome {{Auth::user()->fname}}  to the home page</p>
                         
-                        <!-- Logout Button -->
                         <form action="{{ route('logout') }}" method="post">
                             @csrf
                             <button type="submit" class="btn btn-danger">Logout</button>

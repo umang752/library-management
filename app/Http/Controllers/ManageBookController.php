@@ -7,18 +7,26 @@ use App\Models\Book;
 
 class ManageBookController extends Controller
 {
-    // public function index()
-    // {
-    //     $book = Book::all();
-
-    //     $data = compact('book');
-    //     return view('admin.book.index')->with($data);
-    // }
+    
     public function index()
     {
-        $books = Book::all();
+        
+        $books = Book::paginate(2); 
 
         return view('admin.book.index', compact('books'));
+    }
+
+    public function changeStatus(Request $request, $bookId)
+    {
+        $validatedData = $request->validate([
+            'status' => 'required|in:available,unavailable',
+        ]);
+
+        $book = Book::findOrFail($bookId);
+        $book->status = $validatedData['status'];
+        $book->save();
+
+        return redirect('/admin/book')->with('alert', 'Book status updated successfully');
     }
 
     public function showAddBook()
@@ -37,10 +45,9 @@ class ManageBookController extends Controller
             'total_inventory' => 'required|numeric',
             'issued_copies' => 'required|numeric',
             'price' => 'required|numeric',
-            'image' => 'image|mimes:jpeg,png,jpg,gif|max:2048', // Adjust image validation as needed
+            'image' => 'image|mimes:jpeg,png,jpg,gif|max:2048', 
         ]);
 
-        // Create a new Book instance
         $book = new Book();
         $book->name = $request->input('name');
         $book->author = $request->input('author');
@@ -50,17 +57,15 @@ class ManageBookController extends Controller
         $book->issued_copies = $request->input('issued_copies');
         $book->price = $request->input('price');
 
-        // Handle image upload
         if ($request->hasFile('image')) {
             $image = $request->file('image');
             $imageName = time() . '_' . $image->getClientOriginalName();
             $book->photo = $imageName;
         }
 
-        // Save the book
         $book->save();
 
-        return redirect('admin/book')->with('success', 'Book added successfully');
+        return redirect('admin/book')->with('alert', 'Book added successfully');
     }        
 
 
@@ -70,10 +75,10 @@ class ManageBookController extends Controller
 
         if ($book) {
             $book->delete();
-            return redirect()->back()->with('success', 'book deleted successfully');
+            return redirect()->back()->with('alert', 'book deleted successfully');
         }
 
-        return redirect()->back()->with('error', 'book not found');
+        return redirect()->back()->with('alert', 'book not found');
     }
 
 
@@ -87,7 +92,7 @@ class ManageBookController extends Controller
     {
         $id = $request->input('id');
         $book = Book::where('book_id', $id)->first();
-
+    
         $book->name = $request->input('name');
         $book->author = $request->input('author');
         $book->description = $request->input('description');
@@ -95,8 +100,16 @@ class ManageBookController extends Controller
         $book->total_inventory = $request->input('total_inventory');
         $book->issued_copies = $request->input('issued_copies');
         $book->price = $request->input('price');
-
+    
+        if ($request->hasFile('image')) {
+            $image = $request->file('image');
+            $imageName = time() . '.' . $image->getClientOriginalExtension();
+            $image->move(public_path('images'), $imageName);
+            $book->image = $imageName;
+        }
+    
         $book->save();
-        return redirect('/admin/book')->with('success', 'book details updated');
+        return redirect('/admin/book')->with('alert', 'Book details updated');
     }
+    
 }
